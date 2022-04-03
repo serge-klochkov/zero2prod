@@ -59,9 +59,7 @@ jobs:
             --no-default-features
             --locked
       - name: Run sqlx migration
-        uses: actions-rs/cargo@v1
-        with:
-          command: sqlx migrate run
+        run: sqlx migrate run
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
