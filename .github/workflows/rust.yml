@@ -58,10 +58,10 @@ jobs:
             --features=${{ env.SQLX_FEATURES }}
             --no-default-features
             --locked
-      - name: Migrate database
-        run: |
-          sudo apt-get install libpq-dev -y
-          SKIP_DOCKER=true ./scripts/init_db.sh
+      - name: Run sqlx migration
+        uses: actions-rs/cargo@v1
+        with:
+          command: sqlx migrate run
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
