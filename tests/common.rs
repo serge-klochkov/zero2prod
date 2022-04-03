@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use std::net::TcpListener;
 
 use sqlx::{Connection, PgConnection, PgPool};
@@ -5,6 +6,13 @@ use uuid::Uuid;
 
 use zero2prod::configuration::{get_configuration, DatabaseSettings};
 use zero2prod::startup::run;
+use zero2prod::telemetry;
+
+// Ensure that the `tracing` stack is only initialised once using `once_cell`
+static _TRACING: Lazy<()> = Lazy::new(|| {
+    let subscriber = telemetry::get_subscriber("test".into(), "debug".into());
+    telemetry::init_subscriber(subscriber);
+});
 
 pub struct TestApp {
     pub address: String,
