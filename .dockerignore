@@ -1,0 +1,8 @@
+target
+tests
+Dockerfile
+.dockerignore
+.git
+.gitignore
+.idea
+.github

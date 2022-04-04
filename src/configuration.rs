@@ -4,7 +4,13 @@ use secrecy::{ExposeSecret, Secret};
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application: ApplicationSettings,
+}
+
+#[derive(serde::Deserialize)]
+pub struct ApplicationSettings {
+    pub host: String,
+    pub port: u16,
 }
 
 #[derive(serde::Deserialize)]
@@ -38,8 +44,17 @@ impl DatabaseSettings {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    let base_path = std::env::current_dir().expect("Failed to determine the current directory");
+    let configuration_directory = base_path.join("configuration");
+    // Detect the running environment.
+    let environment: String = std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "local".into());
+    // Read the "default" configuration file
+    let base_src = config::File::from(configuration_directory.join("base")).required(true);
+    // Layer on the environment-specific values.
+    let env_src = config::File::from(configuration_directory.join(environment)).required(true);
     Config::builder()
-        .add_source(config::File::with_name("configuration"))
+        .add_source(base_src)
+        .add_source(env_src)
         .build()?
         .try_deserialize::<Settings>()
 }
