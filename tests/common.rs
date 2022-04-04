@@ -1,4 +1,5 @@
 use once_cell::sync::Lazy;
+use secrecy::ExposeSecret;
 use std::net::TcpListener;
 
 use sqlx::{Connection, PgConnection, PgPool};
@@ -36,15 +37,16 @@ pub async fn spawn_app() -> TestApp {
 
 pub async fn get_db_pool(config: &DatabaseSettings) -> PgPool {
     // Create database
-    let mut connection = PgConnection::connect(&config.connection_string_without_db())
-        .await
-        .expect("Failed to connect to Postgres");
+    let mut connection =
+        PgConnection::connect(&config.connection_string_without_db().expose_secret())
+            .await
+            .expect("Failed to connect to Postgres");
     sqlx::query(format!(r#"CREATE DATABASE "{}";"#, config.database_name).as_str())
         .execute(&mut connection)
         .await
         .expect("Failed to create database.");
     // Migrate database
-    let connection_pool = PgPool::connect(&config.connection_string())
+    let connection_pool = PgPool::connect(&config.connection_string().expose_secret())
         .await
         .expect("Failed to connect to Postgres.");
     sqlx::migrate!("./migrations")
