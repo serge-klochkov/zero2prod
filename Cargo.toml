@@ -15,8 +15,10 @@ name = "zero2prod"
 
 [dependencies]
 actix-web = "4.0.0"
-config = "0.13.0"
+anyhow = "1.0.56"
 chrono = "0.4.19"
+envy = "0.4.2"
+lazy_static = "1.4.0"
 tracing = { version = "0.1.32", features = ["log"] }
 tracing-actix-web = "0.5.1"
 tracing-bunyan-formatter = "0.3.2"
