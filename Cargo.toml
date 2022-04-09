@@ -17,6 +17,7 @@ name = "zero2prod"
 actix-web = "4.0.0"
 anyhow = "1.0.56"
 chrono = "0.4.19"
+derive_more = "0.99.17"
 envy = "0.4.2"
 lazy_static = "1.4.0"
 tracing = { version = "0.1.32", features = ["log"] }
@@ -27,9 +28,12 @@ tracing-subscriber = { version = "0.3.10", features = ["registry", "env-filter"]
 secrecy = { version = "0.8.0", features = ["serde"] }
 serde = { version = "1.0.136", features = ["derive"] }
 sqlx = { version = "0.5.11", features = ["postgres", "runtime-actix-native-tls", "uuid", "time", "chrono"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }
+validator = "0.14.0"
+unicode-segmentation = "1.9.0"
 uuid = { version = "0.8.2", features = ["v4"] }
 
 [dev-dependencies]
-once_cell = "1"
-reqwest = "0.11"
+claim = "0.5.0"
+once_cell = "1.10.0"
+reqwest = "0.11.10"
