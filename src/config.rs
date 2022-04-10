@@ -11,6 +11,7 @@ pub struct Config {
     pub application_host: String,
     pub application_port: u16,
     pub database_url: Secret<String>,
+    pub sendgrid_api_key: Secret<String>,
 }
 
 fn load_config() -> anyhow::Result<Config> {
@@ -21,23 +22,29 @@ fn load_config() -> anyhow::Result<Config> {
         // otherwise, try to load the .env file
         Err(_) => {
             // simulate https://www.npmjs.com/package/dotenv behavior
-            let mut file = File::open(".env")?;
-            let mut content = String::new();
-            file.read_to_string(&mut content)?;
-            for line in content.lines() {
-                let eq_pos = line
-                    .find('=')
-                    .unwrap_or_else(|| panic!("Expected env variable pairs, got {}", content));
-                let key = &line[..eq_pos];
-                let value = &line[(eq_pos + 1)..];
-                std::env::set_var(key, value);
-            }
+            set_env_from_file_content(".env")?;
+            set_env_from_file_content(".env.local")?;
             match envy::from_env::<Config>() {
                 Ok(config) => Ok(config),
                 Err(e) => panic!("Failed to read the config from env: {}", e),
             }
         }
     }
+}
+
+fn set_env_from_file_content(file_path: &str) -> anyhow::Result<()> {
+    let mut file = File::open(file_path)?;
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    for line in content.lines() {
+        let eq_pos = line
+            .find('=')
+            .unwrap_or_else(|| panic!("Expected env variable pairs, got {}", content));
+        let key = &line[..eq_pos];
+        let value = &line[(eq_pos + 1)..];
+        std::env::set_var(key, value);
+    }
+    Ok(())
 }
 
 lazy_static! {
