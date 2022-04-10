@@ -10,7 +10,6 @@ use zero2prod::telemetry;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     lazy_static::initialize(&CONFIG);
-    println!("Config is {:#?}", *CONFIG);
     let subscriber = telemetry::get_subscriber("zero2prod".into(), "info".into());
     telemetry::init_subscriber(subscriber);
     tracing::info!("Connecting to Postgres");
