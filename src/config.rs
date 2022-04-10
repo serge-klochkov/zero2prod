@@ -27,7 +27,7 @@ fn load_config() -> anyhow::Result<Config> {
         Err(_) => {
             // simulate https://www.npmjs.com/package/dotenv behavior
             set_env_from_file_content(".env")?;
-            set_env_from_file_content(".env.local")?;
+            let _ = set_env_from_file_content(".env.local");
             match envy::from_env::<Config>() {
                 Ok(config) => Ok(config),
                 Err(e) => panic!("Failed to read the config from env: {}", e),
