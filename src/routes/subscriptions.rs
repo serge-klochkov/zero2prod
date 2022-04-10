@@ -1,6 +1,7 @@
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
+use crate::events::subscription_created::SubscriptionCreated;
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use sqlx::PgPool;
@@ -29,12 +30,16 @@ impl TryFrom<FormData> for NewSubscriber {
         subscriber_name= %form.name
     )
 )]
-pub async fn subscribe(form: web::Form<FormData>, pg_pool: web::Data<PgPool>) -> HttpResponse {
+pub async fn subscribe(
+    form: web::Form<FormData>,
+    pg_pool: web::Data<PgPool>,
+    nats_connection: web::Data<async_nats::Connection>,
+) -> HttpResponse {
     let new_subscriber = match NewSubscriber::try_from(form.0) {
         Ok(new_subscriber) => new_subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    match insert_subscriber(&pg_pool, &new_subscriber).await {
+    match insert_subscriber(&pg_pool, &nats_connection, &new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
@@ -46,8 +51,9 @@ pub async fn subscribe(form: web::Form<FormData>, pg_pool: web::Data<PgPool>) ->
 )]
 pub async fn insert_subscriber(
     pg_pool: &PgPool,
+    nats_connection: &async_nats::Connection,
     new_subscriber: &NewSubscriber,
-) -> Result<(), sqlx::Error> {
+) -> anyhow::Result<()> {
     sqlx::query(
         r#"
             INSERT INTO subscriptions (id, email, name, subscribed_at)
@@ -65,5 +71,13 @@ pub async fn insert_subscriber(
         tracing::error!("Failed to execute query: {:?}", e);
         e
     })?;
+    SubscriptionCreated::publish(
+        nats_connection,
+        SubscriptionCreated {
+            email: new_subscriber.email.clone(),
+            name: new_subscriber.name.clone(),
+        },
+    )
+    .await?;
     Ok(())
 }

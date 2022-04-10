@@ -29,3 +29,16 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  nats:
+    image: 'nats:2.7.4-alpine'
+    container_name: zero2prod_nats
+    ports:
+      - '4222:4222'
+      - '8222:8222'
+
+  nats-webui:
+    image: 'sphqxe/nats-webui'
+    container_name: zero2prod_nats-webui
+    ports:
+      - '8080:80'

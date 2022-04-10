@@ -11,16 +11,21 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:12
+        image: 'postgres:12'
         env:
-          POSTGRES_USER: zero2prod
-          POSTGRES_PASSWORD: zero2prod
-          POSTGRES_DB: zero2prod
+          POSTGRES_USER: 'zero2prod'
+          POSTGRES_PASSWORD: 'zero2prod'
+          POSTGRES_DB: 'zero2prod'
         ports:
-          - 55432:5432
+          - '55432:5432'
+      nats:
+        image: 'nats:2.7.4-alpine'
+        ports:
+          - '4222:4222'
+          - '8222:8222'
     env:
-      SQLX_VERSION: 0.5.7
-      SQLX_FEATURES: postgres
+      SQLX_VERSION: '0.5.7'
+      SQLX_FEATURES: 'postgres'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2

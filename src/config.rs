@@ -12,6 +12,10 @@ pub struct Config {
     pub application_port: u16,
     pub database_url: Secret<String>,
     pub sendgrid_api_key: Secret<String>,
+    pub nats_host: String,
+    pub nats_port: u16,
+    pub nats_subscription_created_subject: String,
+    pub nats_subscription_created_group: String,
 }
 
 fn load_config() -> anyhow::Result<Config> {
@@ -37,12 +41,14 @@ fn set_env_from_file_content(file_path: &str) -> anyhow::Result<()> {
     let mut content = String::new();
     file.read_to_string(&mut content)?;
     for line in content.lines() {
-        let eq_pos = line
-            .find('=')
-            .unwrap_or_else(|| panic!("Expected env variable pairs, got {}", content));
-        let key = &line[..eq_pos];
-        let value = &line[(eq_pos + 1)..];
-        std::env::set_var(key, value);
+        match line.find('=') {
+            None => {}
+            Some(eq_pos) => {
+                let key = &line[..eq_pos];
+                let value = &line[(eq_pos + 1)..];
+                std::env::set_var(key, value);
+            }
+        }
     }
     Ok(())
 }

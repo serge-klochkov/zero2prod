@@ -1,3 +1,4 @@
+use actix_web::dev::Server;
 use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, PgConnection, PgPool};
@@ -33,7 +34,13 @@ pub async fn spawn_app() -> TestApp {
     let connection_string = &database_url[0..last_slash_index];
     let db_pool = get_db_pool(connection_string, &db_name).await;
 
-    let server = run(listener, db_pool.clone()).expect("Failed to bind address");
+    let nats_connection =
+        async_nats::connect(&format!("{}:{}", CONFIG.nats_host, CONFIG.nats_port))
+            .await
+            .expect("Could not connect to NATS");
+
+    let server: Server =
+        run(listener, db_pool.clone(), nats_connection.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
     TestApp { address, db_pool }

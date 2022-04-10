@@ -1,7 +1,8 @@
 use derive_more::AsRef;
+use serde::{Deserialize, Serialize};
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(AsRef, Debug)]
+#[derive(AsRef, Debug, Serialize, Deserialize, Clone)]
 pub struct SubscriberName(String);
 
 impl SubscriberName {

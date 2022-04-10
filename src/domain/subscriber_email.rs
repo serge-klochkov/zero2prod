@@ -1,7 +1,8 @@
 use derive_more::AsRef;
+use serde::{Deserialize, Serialize};
 use validator::validate_email;
 
-#[derive(AsRef, Debug)]
+#[derive(AsRef, Debug, Serialize, Deserialize, Clone)]
 pub struct SubscriberEmail(String);
 
 impl SubscriberEmail {
