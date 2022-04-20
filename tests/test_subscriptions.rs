@@ -1,3 +1,9 @@
+use std::thread;
+use std::time::Duration;
+use wiremock::matchers::{method, path};
+use wiremock::{Mock, ResponseTemplate};
+use zero2prod::config::CONFIG;
+
 mod common;
 
 #[tokio::test]
@@ -69,4 +75,39 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
             "There should be no saved subscriptions in case of failure"
         );
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn subscribe_sends_a_confirmation_email_for_valid_data() {
+    let test_app = common::spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    Mock::given(path("/mail/send"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&test_app.mock_server)
+        .await;
+
+    let sub_created = test_app
+        .nats_connection
+        .queue_subscribe(
+            &CONFIG.nats_subscription_created_subject,
+            &uuid::Uuid::new_v4().to_string(),
+        )
+        .await
+        .unwrap();
+
+    test_app.post_subscriptions(body.into()).await;
+
+    // Wait for the next message in the "SubscriptionCreated" subject (but with different group)
+    // this way, we assume that the actual business logic subscriber received the message as well
+    // otherwise, we just need to do plain sleep
+    if let Some(_) = sub_created.next().await {
+        // and then shutdown the NATS subscription immediately to continue the test
+        sub_created.unsubscribe().await.unwrap();
+        // FIXME: sleep here is still required so the subscriber has time to process the message
+        thread::sleep(Duration::from_millis(50));
+    }
+
+    // Wiremock asserts on drop
 }
