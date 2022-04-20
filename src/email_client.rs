@@ -77,7 +77,8 @@ impl EmailClient {
             .json(&request)
             .timeout(self.timeout)
             .send()
-            .await?;
+            .await?
+            .error_for_status()?;
         Ok(())
     }
 }

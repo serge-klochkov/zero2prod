@@ -21,6 +21,7 @@ static _TRACING: Lazy<()> = Lazy::new(|| {
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+    pub mock_server: MockServer,
 }
 
 pub async fn spawn_app() -> TestApp {
@@ -42,10 +43,10 @@ pub async fn spawn_app() -> TestApp {
             .await
             .expect("Could not connect to NATS");
 
-    let wiremock = MockServer::start().await;
+    let mock_server = MockServer::start().await;
     let email_client = EmailClient::new(
         "test@example.com",
-        &wiremock.uri(),
+        &mock_server.uri(),
         Duration::from_millis(1000),
     );
 
@@ -58,7 +59,11 @@ pub async fn spawn_app() -> TestApp {
     .expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
-    TestApp { address, db_pool }
+    TestApp {
+        address,
+        db_pool,
+        mock_server,
+    }
 }
 
 pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {

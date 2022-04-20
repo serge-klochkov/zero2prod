@@ -28,7 +28,7 @@ impl Match for MatchSendEmailBody {
 }
 
 #[tokio::test]
-async fn send_mail() {
+async fn succeeds_if_the_server_returns_200() {
     // Arrange
     let mock_server = MockServer::start().await;
     let sender = random_email();
@@ -77,6 +77,32 @@ async fn fails_when_sending_takes_too_long() {
     let email_client = create_email_client(sender.as_ref(), &mock_server, 100);
     let outcome = email_client.send_email(recipient, &subject, &content).await;
 
+    assert_err!(outcome);
+
+    // Wiremock assertions performed on Drop
+}
+
+#[tokio::test]
+async fn fails_if_the_server_returns_500() {
+    // Arrange
+    let mock_server = MockServer::start().await;
+    let sender = random_email();
+    let subscriber_email = random_email();
+    let subject: String = Sentence(1..2).fake();
+    let content: String = Paragraph(1..10).fake();
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(500))
+        .expect(1)
+        .mount(&mock_server)
+        .await;
+
+    // Act
+    let email_client = create_email_client(sender.as_ref(), &mock_server, 1000);
+    let outcome = email_client
+        .send_email(subscriber_email, &subject, &content)
+        .await;
+
+    // Assert
     assert_err!(outcome);
 
     // Wiremock assertions performed on Drop
