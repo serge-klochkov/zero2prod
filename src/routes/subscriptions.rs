@@ -1,6 +1,7 @@
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
+use crate::domain::subscription_status::SubscriptionStatus;
 use crate::events::subscription_created::SubscriptionCreated;
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
@@ -56,14 +57,15 @@ pub async fn insert_subscriber(
 ) -> anyhow::Result<()> {
     sqlx::query(
         r#"
-            INSERT INTO subscriptions (id, email, name, subscribed_at)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO subscriptions (id, email, name, status, subscribed_at)
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT DO NOTHING
         "#,
     )
     .bind(Uuid::new_v4())
     .bind(&new_subscriber.email.as_ref())
     .bind(&new_subscriber.name.as_ref())
+    .bind(SubscriptionStatus::Pending)
     .bind(Utc::now())
     .execute(pg_pool)
     .await

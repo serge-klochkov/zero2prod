@@ -88,6 +88,7 @@ pub struct TestApp {
 }
 
 impl TestApp {
+    #[allow(dead_code)] // FIXME: associated function is never used: `post_subscriptions`
     pub async fn post_subscriptions(&self, body: &str) -> reqwest::Response {
         reqwest::Client::new()
             .post(&format!("{}/subscriptions", &self.address))
