@@ -18,12 +18,6 @@ static _TRACING: Lazy<()> = Lazy::new(|| {
     telemetry::init_subscriber(subscriber);
 });
 
-pub struct TestApp {
-    pub address: String,
-    pub db_pool: PgPool,
-    pub mock_server: MockServer,
-}
-
 pub async fn spawn_app() -> TestApp {
     lazy_static::initialize(&CONFIG);
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
@@ -85,4 +79,22 @@ pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {
         .await
         .expect("Failed to migrate the database");
     connection_pool
+}
+
+pub struct TestApp {
+    pub address: String,
+    pub db_pool: PgPool,
+    pub mock_server: MockServer,
+}
+
+impl TestApp {
+    pub async fn post_subscriptions(&self, body: &str) -> reqwest::Response {
+        reqwest::Client::new()
+            .post(&format!("{}/subscriptions", &self.address))
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(body.to_owned())
+            .send()
+            .await
+            .expect("Failed to execute request.")
+    }
 }
