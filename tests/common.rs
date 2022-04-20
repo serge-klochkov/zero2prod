@@ -3,8 +3,11 @@ use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, PgConnection, PgPool};
 use std::net::TcpListener;
+use std::time::Duration;
 use uuid::Uuid;
+use wiremock::MockServer;
 use zero2prod::config::CONFIG;
+use zero2prod::email_client::EmailClient;
 
 use zero2prod::startup::run;
 use zero2prod::telemetry;
@@ -39,8 +42,20 @@ pub async fn spawn_app() -> TestApp {
             .await
             .expect("Could not connect to NATS");
 
-    let server: Server =
-        run(listener, db_pool.clone(), nats_connection.clone()).expect("Failed to bind address");
+    let wiremock = MockServer::start().await;
+    let email_client = EmailClient::new(
+        "test@example.com",
+        &wiremock.uri(),
+        Duration::from_millis(1000),
+    );
+
+    let server: Server = run(
+        listener,
+        db_pool.clone(),
+        nats_connection.clone(),
+        email_client,
+    )
+    .expect("Failed to bind address");
     let _ = tokio::spawn(server);
 
     TestApp { address, db_pool }

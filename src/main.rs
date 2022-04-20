@@ -1,8 +1,10 @@
 use secrecy::ExposeSecret;
 use std::net::TcpListener;
+use std::time::Duration;
 
 use sqlx::PgPool;
 use zero2prod::config::CONFIG;
+use zero2prod::email_client::EmailClient;
 
 use zero2prod::startup::run;
 use zero2prod::telemetry;
@@ -22,7 +24,13 @@ async fn main() -> std::io::Result<()> {
     let nats_connection =
         async_nats::connect(&format!("{}:{}", CONFIG.nats_host, CONFIG.nats_port)).await?;
 
+    let email_client = EmailClient::new(
+        &CONFIG.email_client_sender_email,
+        &CONFIG.email_client_base_url,
+        Duration::from_secs(CONFIG.email_client_timeout_seconds as u64),
+    );
+
     let address = format!("{}:{}", CONFIG.application_host, CONFIG.application_port);
     let listener = TcpListener::bind(address)?;
-    run(listener, connection_pool, nats_connection)?.await
+    run(listener, connection_pool, nats_connection, email_client)?.await
 }

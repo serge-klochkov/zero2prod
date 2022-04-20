@@ -21,6 +21,7 @@ chrono = "0.4.19"
 derive_more = "0.99.17"
 envy = "0.4.2"
 lazy_static = "1.4.0"
+reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 tracing = { version = "0.1.32", features = ["log"] }
 tracing-actix-web = "0.5.1"
 tracing-bunyan-formatter = "0.3.2"
@@ -34,8 +35,9 @@ tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }
 validator = "0.14.0"
 unicode-segmentation = "1.9.0"
 uuid = { version = "0.8.2", features = ["v4"] }
+wiremock = "0.5"
 
 [dev-dependencies]
 claim = "0.5.0"
+fake = "2.4.3"
 once_cell = "1.10.0"
-reqwest = "0.11.10"

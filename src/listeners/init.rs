@@ -1,7 +1,11 @@
 use crate::config::CONFIG;
+use crate::email_client::EmailClient;
 use crate::events::subscription_created::SubscriptionCreated;
 
-pub async fn init_listeners(nats_connection: &async_nats::Connection) -> anyhow::Result<()> {
+pub async fn init_listeners(
+    nats_connection: &async_nats::Connection,
+    email_client: &EmailClient,
+) -> anyhow::Result<()> {
     let sub_created = nats_connection
         .queue_subscribe(
             &CONFIG.nats_subscription_created_subject,
@@ -9,7 +13,7 @@ pub async fn init_listeners(nats_connection: &async_nats::Connection) -> anyhow:
         )
         .await?;
     if let Some(msg) = sub_created.next().await {
-        SubscriptionCreated::process(msg).await;
+        let _ = SubscriptionCreated::process(email_client, msg).await;
     }
     Ok(())
 }
