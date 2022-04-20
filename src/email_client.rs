@@ -14,27 +14,28 @@ pub struct EmailClient {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Personalization {
-    to: Vec<Email>,
+struct Personalization<'a> {
+    #[serde(borrow)]
+    to: Vec<Email<'a>>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct Email {
-    email: String,
+struct Email<'a> {
+    email: &'a str,
 }
 
 #[derive(Serialize, Deserialize)]
-struct Content {
-    r#type: String,
-    value: String,
+struct Content<'a> {
+    r#type: &'a str,
+    value: &'a str,
 }
 
 #[derive(Serialize, Deserialize)]
-struct SendEmailRequest {
-    personalizations: Vec<Personalization>,
-    from: Email,
-    subject: String,
-    content: Vec<Content>,
+struct SendEmailRequest<'a> {
+    personalizations: Vec<Personalization<'a>>,
+    from: Email<'a>,
+    subject: &'a str,
+    content: Vec<Content<'a>>,
 }
 
 impl EmailClient {
@@ -55,18 +56,18 @@ impl EmailClient {
     ) -> anyhow::Result<()> {
         let url = format!("{}/mail/send", &self.base_url);
         let request = SendEmailRequest {
-            subject: subject.to_owned(),
+            subject,
             from: Email {
-                email: self.sender.clone(),
+                email: &self.sender,
             },
             personalizations: vec![Personalization {
                 to: vec![Email {
-                    email: recipient.as_ref().to_owned(),
+                    email: recipient.as_ref(),
                 }],
             }],
             content: vec![Content {
-                value: text_content.to_owned(),
-                r#type: "text/plain".to_owned(),
+                value: text_content,
+                r#type: "text/plain",
             }],
         };
         self.http_client
