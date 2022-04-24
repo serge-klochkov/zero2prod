@@ -1,5 +1,9 @@
 # Zero To Production In Rust
 
+## Cargo config
+
+See the comments in `.cargo/config.yml` and install the required tools for your platform
+
 ## Pre-commit hooks
 
 You will need to install `pre-commit` tool and generate the Git hooks:
