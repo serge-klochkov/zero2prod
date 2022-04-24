@@ -50,7 +50,7 @@ impl EmailClient {
 
     pub async fn send_email(
         &self,
-        recipient: SubscriberEmail,
+        recipient: &SubscriberEmail,
         subject: &str,
         text_content: &str,
     ) -> anyhow::Result<()> {

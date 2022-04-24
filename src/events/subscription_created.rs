@@ -1,4 +1,5 @@
 use crate::config::CONFIG;
+use crate::db::subscription_queries::SubscriptionQueries;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
 
@@ -15,25 +16,46 @@ pub struct SubscriptionCreated {
 impl SubscriptionCreated {
     #[tracing::instrument(
         name = "Processing SubscriptionCreated event",
-        skip(email_client, message),
+        skip(email_client, subscription_queries),
         fields(
             message_subject = %message.subject,
         )
     )]
-    pub async fn process(email_client: &EmailClient, message: Message) -> anyhow::Result<()> {
+    pub async fn process(
+        email_client: &EmailClient,
+        subscription_queries: &SubscriptionQueries,
+        message: Message,
+    ) -> anyhow::Result<()> {
         match serde_json::from_slice::<SubscriptionCreated>(&message.data) {
             Ok(event) => {
-                email_client
+                let mail_send_result = email_client
                     .send_email(
-                        event.email,
+                        &event.email,
                         "Subscription confirmation",
-                        &format!("Hello {}", event.name.as_ref()),
+                        &format!("Hello {}", &event.name.as_ref()),
                     )
-                    .await?
-                // tracing::info!("SubscriptionCreated event processed: {:?}", event)
+                    .await;
+                // TODO: should be proper retry mechanism with different retry + final fail branches
+                match mail_send_result {
+                    Ok(_) => {
+                        tracing::info!("SubscriptionCreated event email sent")
+                    }
+                    Err(_) => {
+                        tracing::error!("Failed to send SubscriptionCreated event mail, setting the subscription status to failed");
+                        let update_result = subscription_queries
+                            .mark_subscription_as_failed(&event.email)
+                            .await;
+                        match update_result {
+                            Ok(_) => {}
+                            Err(_) => {
+                                tracing::error!("Failed to mark subscription as failed")
+                            }
+                        }
+                    }
+                }
             }
             Err(_) => {
-                tracing::error!("Could not deserialize message"); // TODO log the message itself
+                tracing::error!("Could not deserialize message");
             }
         };
         Ok(())

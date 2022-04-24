@@ -106,7 +106,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         // and then shutdown the NATS subscription immediately to continue the test
         sub_created.unsubscribe().await.unwrap();
         // FIXME: sleep here is still required so the subscriber has time to process the message
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(500));
     }
 
     // Wiremock asserts on drop

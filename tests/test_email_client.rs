@@ -50,7 +50,7 @@ async fn succeeds_if_the_server_returns_200() {
     // Act
     let email_client = create_email_client(sender.as_ref(), &mock_server, 1000);
     let _ = email_client
-        .send_email(recipient, &subject, &content)
+        .send_email(&recipient, &subject, &content)
         .await
         .unwrap();
 
@@ -75,7 +75,9 @@ async fn fails_when_sending_takes_too_long() {
 
     // Act
     let email_client = create_email_client(sender.as_ref(), &mock_server, 100);
-    let outcome = email_client.send_email(recipient, &subject, &content).await;
+    let outcome = email_client
+        .send_email(&recipient, &subject, &content)
+        .await;
 
     assert_err!(outcome);
 
@@ -99,7 +101,7 @@ async fn fails_if_the_server_returns_500() {
     // Act
     let email_client = create_email_client(sender.as_ref(), &mock_server, 1000);
     let outcome = email_client
-        .send_email(subscriber_email, &subject, &content)
+        .send_email(&subscriber_email, &subject, &content)
         .await;
 
     // Assert

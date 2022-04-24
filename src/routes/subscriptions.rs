@@ -1,12 +1,9 @@
+use crate::db::subscription_queries::SubscriptionQueries;
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
-use crate::domain::subscription_status::SubscriptionStatus;
 use crate::events::subscription_created::SubscriptionCreated;
 use actix_web::{web, HttpResponse};
-use chrono::Utc;
-use sqlx::PgPool;
-use uuid::Uuid;
 
 #[derive(serde::Deserialize, Debug)]
 pub struct FormData {
@@ -25,7 +22,7 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, pg_pool),
+    skip(form, subscription_queries),
     fields(
         subscriber_email = %form.email,
         subscriber_name= %form.name
@@ -33,46 +30,32 @@ impl TryFrom<FormData> for NewSubscriber {
 )]
 pub async fn subscribe(
     form: web::Form<FormData>,
-    pg_pool: web::Data<PgPool>,
+    subscription_queries: web::Data<SubscriptionQueries>,
     nats_connection: web::Data<async_nats::Connection>,
 ) -> HttpResponse {
     let new_subscriber = match NewSubscriber::try_from(form.0) {
         Ok(new_subscriber) => new_subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    match insert_subscriber(&pg_pool, &nats_connection, &new_subscriber).await {
+    match subscribe_handler(&subscription_queries, &nats_connection, &new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
 
+// TODO: extract to "handlers"?
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(new_subscriber, pg_pool)
+    skip(new_subscriber, nats_connection, subscription_queries)
 )]
-pub async fn insert_subscriber(
-    pg_pool: &PgPool,
+pub async fn subscribe_handler(
+    subscription_queries: &SubscriptionQueries,
     nats_connection: &async_nats::Connection,
     new_subscriber: &NewSubscriber,
 ) -> anyhow::Result<()> {
-    sqlx::query(
-        r#"
-            INSERT INTO subscriptions (id, email, name, status, subscribed_at)
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT DO NOTHING
-        "#,
-    )
-    .bind(Uuid::new_v4())
-    .bind(&new_subscriber.email.as_ref())
-    .bind(&new_subscriber.name.as_ref())
-    .bind(SubscriptionStatus::Pending)
-    .bind(Utc::now())
-    .execute(pg_pool)
-    .await
-    .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
-        e
-    })?;
+    subscription_queries
+        .insert_subscriber(new_subscriber)
+        .await?;
     SubscriptionCreated::publish(
         nats_connection,
         SubscriptionCreated {
