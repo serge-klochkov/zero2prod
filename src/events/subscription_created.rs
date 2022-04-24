@@ -2,6 +2,7 @@ use crate::config::CONFIG;
 use crate::db::subscription_queries::SubscriptionQueries;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
@@ -28,12 +29,15 @@ impl SubscriptionCreated {
     ) -> anyhow::Result<()> {
         match serde_json::from_slice::<SubscriptionCreated>(&message.data) {
             Ok(event) => {
+                let subscription_token = Uuid::new_v4().to_string();
+                let text_content = format!(
+                    "Welcome to our newsletter!\n\
+                    Visit {}/subscriptions/confirm/{} to confirm your subscription",
+                    CONFIG.application_base_url(),
+                    subscription_token
+                );
                 let mail_send_result = email_client
-                    .send_email(
-                        &event.email,
-                        "Subscription confirmation",
-                        &format!("Hello {}", &event.name.as_ref()),
-                    )
+                    .send_email(&event.email, "Subscription confirmation", &text_content)
                     .await;
                 // TODO: should be proper retry mechanism with different retry + final fail branches
                 match mail_send_result {

@@ -2,6 +2,7 @@ use crate::config::CONFIG;
 use reqwest::Client;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::time::Duration;
 
 use crate::domain::subscriber_email::SubscriberEmail;
@@ -14,28 +15,29 @@ pub struct EmailClient {
 }
 
 #[derive(Serialize, Deserialize)]
-struct Personalization<'a> {
+pub struct Personalization<'a> {
     #[serde(borrow)]
-    to: Vec<Email<'a>>,
+    pub to: Vec<Email<'a>>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct Email<'a> {
-    email: &'a str,
+pub struct Email<'a> {
+    pub email: &'a str,
 }
 
 #[derive(Serialize, Deserialize)]
-struct Content<'a> {
-    r#type: &'a str,
-    value: &'a str,
+pub struct Content<'a> {
+    pub r#type: &'a str,
+    // See https://github.com/serde-rs/serde/issues/1413#issuecomment-494892266
+    pub value: Cow<'a, str>,
 }
 
 #[derive(Serialize, Deserialize)]
-struct SendEmailRequest<'a> {
-    personalizations: Vec<Personalization<'a>>,
-    from: Email<'a>,
-    subject: &'a str,
-    content: Vec<Content<'a>>,
+pub struct SendEmailRequest<'a> {
+    pub personalizations: Vec<Personalization<'a>>,
+    pub from: Email<'a>,
+    pub subject: &'a str,
+    pub content: Vec<Content<'a>>,
 }
 
 impl EmailClient {
@@ -66,7 +68,7 @@ impl EmailClient {
                 }],
             }],
             content: vec![Content {
-                value: text_content,
+                value: Cow::Borrowed(text_content),
                 r#type: "text/plain",
             }],
         };

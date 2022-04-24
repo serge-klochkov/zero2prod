@@ -1,15 +1,15 @@
 use std::fs::File;
 use std::io::Read;
 
+use lazy_static::lazy_static;
 use secrecy::Secret;
 use serde::Deserialize;
-
-use lazy_static::lazy_static;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub application_host: String,
     pub application_port: u16,
+    pub application_protocol: String,
     pub database_url: Secret<String>,
     pub nats_host: String,
     pub nats_port: u16,
@@ -19,6 +19,15 @@ pub struct Config {
     pub email_client_sender_email: String,
     pub email_client_base_url: String,
     pub email_client_timeout_seconds: u16,
+}
+impl Config {
+    // TODO memoize?
+    pub fn application_base_url(&self) -> String {
+        format!(
+            "{}://{}:{}",
+            CONFIG.application_protocol, CONFIG.application_host, CONFIG.application_port
+        )
+    }
 }
 
 fn load_config() -> anyhow::Result<Config> {

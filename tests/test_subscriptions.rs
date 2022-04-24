@@ -3,6 +3,7 @@ use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 use zero2prod::config::CONFIG;
+use zero2prod::email_client::SendEmailRequest;
 
 mod common;
 
@@ -108,6 +109,16 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         // FIXME: sleep here is still required so the subscriber has time to process the message
         thread::sleep(Duration::from_millis(500));
     }
+
+    // Assert
+    let email_request = &test_app.mock_server.received_requests().await.unwrap()[0];
+    let body: SendEmailRequest = serde_json::from_slice(&email_request.body).unwrap();
+
+    let links: Vec<_> = linkify::LinkFinder::new()
+        .links(body.content.first().unwrap().value.as_ref())
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .collect();
+    assert_eq!(links.len(), 1);
 
     // Wiremock asserts on drop
 }
