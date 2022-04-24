@@ -83,7 +83,7 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let test_app = common::spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
