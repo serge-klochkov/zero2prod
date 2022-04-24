@@ -97,6 +97,9 @@ jobs:
           POSTGRES_DB: 'zero2prod'
         ports:
           - '55432:5432'
+    env:
+      SQLX_VERSION: '0.5.7'
+      SQLX_FEATURES: 'postgres'
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
@@ -104,6 +107,27 @@ jobs:
           toolchain: stable
           override: true
           components: clippy
+      - name: Cache sqlx-cli
+        uses: actions/cache@v2
+        id: cache-sqlx
+        with:
+          path: |
+            ~/.cargo/bin/sqlx
+          key: ${{ runner.os }}-sqlx-${{ env.SQLX_VERSION }}-${{ env.SQLX_FEATURES }}
+      - name: Install sqlx-cli
+        uses: actions-rs/cargo@v1
+        if: steps.cache-sqlx.outputs.cache-hit == false
+        with:
+          command: install
+          args: >
+            sqlx-cli
+            --force
+            --version=${{ env.SQLX_VERSION }}
+            --features=${{ env.SQLX_FEATURES }}
+            --no-default-features
+            --locked
+      - name: Run sqlx migration
+        run: sqlx migrate run
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
