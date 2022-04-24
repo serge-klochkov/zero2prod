@@ -88,6 +88,15 @@ jobs:
   clippy:
     name: Clippy
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: 'postgres:12'
+        env:
+          POSTGRES_USER: 'zero2prod'
+          POSTGRES_PASSWORD: 'zero2prod'
+          POSTGRES_DB: 'zero2prod'
+        ports:
+          - '55432:5432'
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
