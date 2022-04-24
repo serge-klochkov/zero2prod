@@ -1,5 +1,4 @@
 use crate::common::spawn_app;
-use uuid::Uuid;
 
 mod common;
 
