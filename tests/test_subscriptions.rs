@@ -1,9 +1,6 @@
 use reqwest::Url;
-use std::thread;
-use std::time::Duration;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
-use zero2prod::config::CONFIG;
 use zero2prod::email_client::SendEmailRequest;
 
 mod common;
@@ -86,7 +83,7 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let test_app = common::spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
@@ -97,29 +94,20 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         .mount(&test_app.mock_server)
         .await;
 
-    let sub_created = test_app
-        .nats_connection
-        .queue_subscribe(
-            &CONFIG.nats_subscription_created_subject,
-            &uuid::Uuid::new_v4().to_string(),
-        )
-        .await
-        .unwrap();
-
     test_app.post_subscriptions(body.into()).await;
 
-    // Wait for the next message in the "SubscriptionCreated" subject (but with different group)
-    // this way, we assume that the actual business logic subscriber received the message as well
-    // otherwise, we just need to do plain sleep
-    if let Some(_) = sub_created.next().await {
-        // and then shutdown the NATS subscription immediately to continue the test
-        sub_created.unsubscribe().await.unwrap();
-        // FIXME: sleep here is still required so the subscriber has time to process the message
-        thread::sleep(Duration::from_millis(500));
-    }
+    let received_requests = common::eventually(|| async {
+        let maybe_requests = test_app.mock_server.received_requests().await;
+        let requests = maybe_requests.unwrap_or(vec![]);
+        if requests.len() > 0 {
+            Ok(requests)
+        } else {
+            anyhow::bail!("Have no received requests yet")
+        }
+    })
+    .await;
 
-    let email_request = &test_app.mock_server.received_requests().await.unwrap()[0];
-    let body: SendEmailRequest = serde_json::from_slice(&email_request.body).unwrap();
+    let body: SendEmailRequest = serde_json::from_slice(&received_requests[0].body).unwrap();
 
     let links: Vec<_> = linkify::LinkFinder::new()
         .links(body.content.first().unwrap().value.as_ref())

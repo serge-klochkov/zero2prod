@@ -2,6 +2,7 @@ use actix_web::dev::Server;
 use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, PgConnection, PgPool};
+use std::future::Future;
 use std::net::TcpListener;
 use std::time::Duration;
 use uuid::Uuid;
@@ -82,6 +83,26 @@ pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {
         .await
         .expect("Failed to migrate the database");
     connection_pool
+}
+
+pub async fn eventually<F, Fut, T>(mut f: F) -> T
+where
+    F: FnMut() -> Fut,
+    Fut: Future<Output = anyhow::Result<T>>,
+{
+    let mut counter = 0;
+    loop {
+        let result = f().await;
+        if result.is_err() {
+            counter += 1;
+            std::thread::sleep(Duration::from_millis(50));
+        } else if counter > 100 {
+            panic!("We tried so many times. Enough.")
+        } else {
+            println!("Eventually succeeded after {} tries", counter + 1);
+            return result.unwrap();
+        }
+    }
 }
 
 pub struct TestApp {
