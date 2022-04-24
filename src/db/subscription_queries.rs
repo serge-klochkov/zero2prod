@@ -1,5 +1,4 @@
 use crate::domain::new_subscriber::NewSubscriber;
-use crate::domain::subscriber_email::SubscriberEmail;
 use chrono::Utc;
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -16,7 +15,7 @@ impl SubscriptionQueries {
         Self { pg_pool }
     }
 
-    #[tracing::instrument(name = "Insert subscriptions", skip(self))]
+    #[tracing::instrument(name = "Insert new subscription", skip(self))]
     pub async fn insert_subscriber(&self, new_subscriber: &NewSubscriber) -> anyhow::Result<Uuid> {
         let id = Uuid::new_v4();
         sqlx::query(
@@ -40,16 +39,21 @@ impl SubscriptionQueries {
         Ok(id)
     }
 
-    #[tracing::instrument(name = "Mark subscription as failed", skip(self))]
-    pub async fn mark_subscription_as_failed(&self, email: &SubscriberEmail) -> anyhow::Result<()> {
+    #[tracing::instrument(name = "Update subscription status", skip(self))]
+    pub async fn update_subscription_status(
+        &self,
+        subscription_id: &Uuid,
+        status: SubscriptionStatus,
+    ) -> anyhow::Result<()> {
         sqlx::query(
             r#"
                 UPDATE subscriptions 
-                SET status = 'failed'
-                WHERE email = $1
+                SET status = $1
+                WHERE id = $2
             "#,
         )
-        .bind(email.as_ref())
+        .bind(status)
+        .bind(subscription_id)
         .execute(self.pg_pool.as_ref())
         .await
         .map_err(|e| {
@@ -57,5 +61,53 @@ impl SubscriptionQueries {
             e
         })?;
         Ok(())
+    }
+
+    #[tracing::instrument(name = "Store subscription token in the database", skip(self))]
+    pub async fn store_token(
+        &self,
+        subscriber_id: &Uuid,
+        subscription_token: &Uuid,
+    ) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"
+                INSERT INTO subscription_tokens (subscription_token, subscriber_id)
+                VALUES ($1, $2)
+            "#,
+        )
+        .bind(subscription_token.to_string().as_str())
+        .bind(subscriber_id)
+        .execute(self.pg_pool.as_ref())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+        Ok(())
+    }
+
+    #[tracing::instrument(
+        name = "Fetch subscription email by token from the database",
+        skip(self)
+    )]
+    pub async fn fetch_subscription_id_by_token(
+        &self,
+        subscription_token: &str,
+    ) -> anyhow::Result<Option<Uuid>> {
+        let result = sqlx::query!(
+            r#"
+                SELECT subscriber_id 
+                FROM subscription_tokens 
+                WHERE subscription_token = $1
+            "#,
+            subscription_token
+        )
+        .fetch_optional(self.pg_pool.as_ref())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+        Ok(result.map(|r| r.subscriber_id))
     }
 }

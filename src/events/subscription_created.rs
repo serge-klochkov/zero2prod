@@ -6,12 +6,15 @@ use uuid::Uuid;
 
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
+use crate::domain::subscription_status::SubscriptionStatus;
 use crate::email_client::EmailClient;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SubscriptionCreated {
     pub email: SubscriberEmail,
     pub name: SubscriberName,
+    pub subscription_token: Uuid,
+    pub subscription_id: Uuid,
 }
 
 impl SubscriptionCreated {
@@ -29,12 +32,12 @@ impl SubscriptionCreated {
     ) -> anyhow::Result<()> {
         match serde_json::from_slice::<SubscriptionCreated>(&message.data) {
             Ok(event) => {
-                let subscription_token = Uuid::new_v4().to_string();
                 let text_content = format!(
                     "Welcome to our newsletter!\n\
-                    Visit {}/subscriptions/confirm/{} to confirm your subscription",
+                    Visit {}/subscriptions/confirm?subscription_token={} \
+                    to confirm your subscription",
                     CONFIG.application_base_url(),
-                    subscription_token
+                    event.subscription_token
                 );
                 let mail_send_result = email_client
                     .send_email(&event.email, "Subscription confirmation", &text_content)
@@ -47,7 +50,10 @@ impl SubscriptionCreated {
                     Err(_) => {
                         tracing::error!("Failed to send SubscriptionCreated event mail, setting the subscription status to failed");
                         let update_result = subscription_queries
-                            .mark_subscription_as_failed(&event.email)
+                            .update_subscription_status(
+                                &event.subscription_id,
+                                SubscriptionStatus::Failed,
+                            )
                             .await;
                         match update_result {
                             Ok(_) => {}

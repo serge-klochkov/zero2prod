@@ -1,3 +1,4 @@
+use reqwest::Url;
 use std::thread;
 use std::time::Duration;
 use wiremock::matchers::{method, path};
@@ -13,13 +14,20 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = test_app.post_subscriptions(body).await;
     assert_eq!(200, response.status().as_u16());
+}
 
-    let saved = sqlx::query!("SELECT email, name FROM subscriptions")
+#[tokio::test]
+async fn subscribe_persists_the_new_subscriber() {
+    let test_app = common::spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    test_app.post_subscriptions(body).await;
+    let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions")
         .fetch_one(&test_app.db_pool)
         .await
         .expect("Failed to fetch saved subscription");
     assert_eq!(saved.email, "ursula_le_guin@gmail.com");
     assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, Some("pending".to_owned()));
 }
 
 #[tokio::test]
@@ -110,7 +118,6 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         thread::sleep(Duration::from_millis(500));
     }
 
-    // Assert
     let email_request = &test_app.mock_server.received_requests().await.unwrap()[0];
     let body: SendEmailRequest = serde_json::from_slice(&email_request.body).unwrap();
 
@@ -119,6 +126,28 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         .filter(|l| *l.kind() == linkify::LinkKind::Url)
         .collect();
     assert_eq!(links.len(), 1);
+
+    // The link from the email should work; replace the port form .env with test app random port
+    let mut confirmation_url = Url::parse(links.first().unwrap().as_str()).unwrap();
+    assert_eq!(confirmation_url.host_str().unwrap(), "127.0.0.1");
+
+    confirmation_url.set_port(Some(test_app.port)).unwrap();
+    let confirmation_link = confirmation_url.as_str();
+    let response = reqwest::Client::new()
+        .get(confirmation_link)
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(response.status().as_u16(), 200);
+
+    // Subscription is now confirmed
+    let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions",)
+        .fetch_one(&test_app.db_pool)
+        .await
+        .expect("Failed to fetch saved subscription.");
+    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
+    assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.status, Some("confirmed".to_owned()));
 
     // Wiremock asserts on drop
 }

@@ -56,6 +56,7 @@ pub async fn spawn_app() -> TestApp {
 
     TestApp {
         address,
+        port,
         db_pool,
         mock_server,
         nats_connection,
@@ -85,6 +86,7 @@ pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {
 
 pub struct TestApp {
     pub address: String,
+    pub port: u16,
     pub db_pool: PgPool,
     pub mock_server: MockServer,
     pub nats_connection: async_nats::Connection,
@@ -99,6 +101,6 @@ impl TestApp {
             .body(body.to_owned())
             .send()
             .await
-            .expect("Failed to execute request.")
+            .expect("Failed to execute request")
     }
 }

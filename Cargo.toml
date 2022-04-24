@@ -34,7 +34,7 @@ sqlx = { version = "0.5.11", features = ["postgres", "runtime-actix-native-tls",
 tokio = { version = "1.17.0", features = ["macros", "rt-multi-thread"] }
 validator = "0.14.0"
 unicode-segmentation = "1.9.0"
-uuid = { version = "0.8.2", features = ["v4"] }
+uuid = { version = "0.8.2", features = ["v4", "serde"] }
 wiremock = "0.5"
 
 [dev-dependencies]

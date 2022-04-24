@@ -2,13 +2,13 @@ use std::net::TcpListener;
 
 use crate::db::subscription_queries::SubscriptionQueries;
 use crate::email_client::EmailClient;
-use crate::listeners::init::init_listeners;
+use crate::init_listeners::init_listeners;
 use actix_web::dev::Server;
 use actix_web::{web, App, HttpServer};
 use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
 
-use crate::routes::{health_check, subscribe};
+use crate::routes::{health_check, subscribe, subscriptions_confirm};
 
 pub fn run(
     listener: TcpListener,
@@ -40,6 +40,10 @@ pub fn run(
             .wrap(TracingLogger::default())
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
+            .route(
+                "/subscriptions/confirm",
+                web::get().to(subscriptions_confirm),
+            )
             .app_data(subscription_queries_data.clone())
             .app_data(nats_connection_data.clone())
             .app_data(email_client_data.clone())
