@@ -50,4 +50,7 @@ Responses
 * Instead of synchronously sending an email on new subscription creation, 
 NATS is used as a message broker, enabling background email sending 
 as it is a third party dependency and should not block the main path.
+* `eventually` helper in `test/common.rs` module. 
+Helps waiting only required amount of time until an async background operation 
+(such as NATS event handling) is completed.
 * DB layer is separated from `routes` module

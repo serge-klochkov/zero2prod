@@ -96,15 +96,19 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
 
     test_app.post_subscriptions(body.into()).await;
 
-    let received_requests = common::eventually(|| async {
-        let maybe_requests = test_app.mock_server.received_requests().await;
-        let requests = maybe_requests.unwrap_or(vec![]);
-        if requests.len() > 0 {
-            Ok(requests)
-        } else {
-            anyhow::bail!("Have no received requests yet")
-        }
-    })
+    let received_requests = common::eventually(
+        || async {
+            let maybe_requests = test_app.mock_server.received_requests().await;
+            let requests = maybe_requests.unwrap_or(vec![]);
+            if requests.len() > 0 {
+                Ok(requests)
+            } else {
+                anyhow::bail!("Have no received requests yet")
+            }
+        },
+        100,
+        50,
+    )
     .await;
 
     let body: SendEmailRequest = serde_json::from_slice(&received_requests[0].body).unwrap();

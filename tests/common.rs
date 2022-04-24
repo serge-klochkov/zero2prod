@@ -85,7 +85,7 @@ pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {
     connection_pool
 }
 
-pub async fn eventually<F, Fut, T>(mut f: F) -> T
+pub async fn eventually<F, Fut, T>(mut f: F, max_tries: u16, wait_between_tries: u16) -> T
 where
     F: FnMut() -> Fut,
     Fut: Future<Output = anyhow::Result<T>>,
@@ -95,8 +95,8 @@ where
         let result = f().await;
         if result.is_err() {
             counter += 1;
-            std::thread::sleep(Duration::from_millis(50));
-        } else if counter > 100 {
+            std::thread::sleep(Duration::from_millis(wait_between_tries as u64));
+        } else if counter > max_tries {
             panic!("We tried so many times. Enough.")
         } else {
             println!("Eventually succeeded after {} tries", counter + 1);
