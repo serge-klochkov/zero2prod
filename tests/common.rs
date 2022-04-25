@@ -93,11 +93,11 @@ where
     let mut counter = 0;
     loop {
         let result = f().await;
-        if result.is_err() {
+        if counter > max_tries {
+            panic!("We tried so many times. Enough.")
+        } else if result.is_err() {
             counter += 1;
             std::thread::sleep(Duration::from_millis(wait_between_tries as u64));
-        } else if counter > max_tries {
-            panic!("We tried so many times. Enough.")
         } else {
             println!("Eventually succeeded after {} tries", counter + 1);
             return result.unwrap();
