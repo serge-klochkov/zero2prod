@@ -5,7 +5,7 @@ use zero2prod::email_client::SendEmailRequest;
 
 mod common;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn subscribe_returns_a_200_for_valid_form_data() {
     let test_app = common::spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
@@ -13,7 +13,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
     assert_eq!(200, response.status().as_u16());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn subscribe_persists_the_new_subscriber() {
     let test_app = common::spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
@@ -27,7 +27,7 @@ async fn subscribe_persists_the_new_subscriber() {
     assert_eq!(saved.status, Some("pending".to_owned()));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn subscribe_returns_a_400_when_data_is_missing() {
     let test_app = common::spawn_app().await;
     let test_cases = vec![
@@ -55,7 +55,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
     let test_app = common::spawn_app().await;
     let test_cases = vec![
@@ -83,7 +83,7 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
     }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[tokio::test(flavor = "multi_thread")]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let test_app = common::spawn_app().await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";

@@ -1,6 +1,6 @@
 mod common;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn health_check_works() {
     let test_app = common::spawn_app().await;
     let client = reqwest::Client::new();

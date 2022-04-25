@@ -2,7 +2,7 @@ use crate::common::spawn_app;
 
 mod common;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn confirmations_without_token_are_rejected_with_a_400() {
     // Arrange
     let app = spawn_app().await;

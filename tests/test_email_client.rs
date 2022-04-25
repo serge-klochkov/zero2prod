@@ -27,7 +27,7 @@ impl Match for MatchSendEmailBody {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn succeeds_if_the_server_returns_200() {
     // Arrange
     let mock_server = MockServer::start().await;
@@ -57,7 +57,7 @@ async fn succeeds_if_the_server_returns_200() {
     // Wiremock assertions performed on Drop
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn fails_when_sending_takes_too_long() {
     // Arrange
     let mock_server = MockServer::start().await;
@@ -84,7 +84,7 @@ async fn fails_when_sending_takes_too_long() {
     // Wiremock assertions performed on Drop
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn fails_if_the_server_returns_500() {
     // Arrange
     let mock_server = MockServer::start().await;
