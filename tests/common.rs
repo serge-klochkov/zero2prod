@@ -85,6 +85,7 @@ pub async fn get_db_pool(connection_string: &str, db_name: &str) -> PgPool {
     connection_pool
 }
 
+#[allow(dead_code)] // FIXME: associated function is never used: `eventually`
 pub async fn eventually<F, Fut, T>(mut f: F, max_tries: u16, wait_between_tries: u16) -> T
 where
     F: FnMut() -> Fut,

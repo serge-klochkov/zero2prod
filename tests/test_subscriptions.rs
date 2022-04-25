@@ -103,7 +103,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
             if requests.len() > 0 {
                 Ok(requests)
             } else {
-                anyhow::bail!("Have no received requests yet")
+                anyhow::bail!("Mock server has no received requests yet")
             }
         },
         100,
