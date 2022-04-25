@@ -26,6 +26,7 @@ jobs:
     env:
       SQLX_VERSION: '0.5.7'
       SQLX_FEATURES: 'postgres'
+      TEST_LOG: 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2

@@ -13,7 +13,7 @@ use zero2prod::telemetry;
 async fn main() -> std::io::Result<()> {
     lazy_static::initialize(&CONFIG);
 
-    let subscriber = telemetry::get_subscriber("zero2prod".into(), "info".into());
+    let subscriber = telemetry::get_subscriber("zero2prod".into(), "info".into(), std::io::stdout);
     telemetry::init_subscriber(subscriber);
     tracing::info!("Connecting to Postgres");
 

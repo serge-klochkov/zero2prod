@@ -14,13 +14,27 @@ use zero2prod::startup::run;
 use zero2prod::telemetry;
 
 // Ensure that the `tracing` stack is only initialised once using `once_cell`
-static _TRACING: Lazy<()> = Lazy::new(|| {
-    let subscriber = telemetry::get_subscriber("test".into(), "debug".into());
-    telemetry::init_subscriber(subscriber);
+static TRACING: Lazy<()> = Lazy::new(|| {
+    let default_filter_level = "info".to_string();
+    let subscriber_name = "test".to_string();
+    // We cannot assign the output of `get_subscriber` to a variable based on the value
+    // of `TEST_LOG` because the sink is part of the type returned by `get_subscriber`,
+    // therefore they are not the same type. We could work around it, but this is the
+    // most straight-forward way of moving forward.
+    if std::env::var("TEST_LOG").is_ok() {
+        let subscriber =
+            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::stdout);
+        telemetry::init_subscriber(subscriber);
+    } else {
+        let subscriber =
+            telemetry::get_subscriber(subscriber_name, default_filter_level, std::io::sink);
+        telemetry::init_subscriber(subscriber);
+    };
 });
 
 pub async fn spawn_app() -> TestApp {
     lazy_static::initialize(&CONFIG);
+    let _ = Lazy::force(&TRACING); // FIXME: use either Lazy or lazy_static! macro
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
