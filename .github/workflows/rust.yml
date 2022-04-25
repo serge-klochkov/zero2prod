@@ -68,7 +68,8 @@ jobs:
       - name: Run cargo test
         uses: actions-rs/cargo@v1
         with:
-          command: test -- --test-threads=2
+          command: test
+          args: -- --test-threads=2
 
   fmt:
     name: Rustfmt
