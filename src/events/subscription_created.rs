@@ -47,8 +47,12 @@ impl SubscriptionCreated {
                     Ok(_) => {
                         tracing::info!("SubscriptionCreated event email sent")
                     }
-                    Err(_) => {
-                        tracing::error!("Failed to send SubscriptionCreated event mail, setting the subscription status to failed");
+                    Err(err) => {
+                        tracing::error!(
+                            error = %err,
+                            "Failed to send SubscriptionCreated event mail, \
+                            setting the subscription status to failed",
+                        );
                         let update_result = subscription_queries
                             .update_subscription_status(
                                 &event.subscription_id,
@@ -78,7 +82,7 @@ impl SubscriptionCreated {
     ) -> anyhow::Result<()> {
         nats_connection
             .publish(
-                &CONFIG.nats_subscription_created_subject,
+                &CONFIG.nats_subscription_created_subject(),
                 serde_json::to_vec(&event)?,
             )
             .await?;

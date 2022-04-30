@@ -7,13 +7,14 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {
+    pub application_id: String,
     pub application_host: String,
     pub application_port: u16,
     pub application_protocol: String,
     pub database_url: Secret<String>,
     pub nats_host: String,
     pub nats_port: u16,
-    pub nats_subscription_created_subject: String,
+    nats_subscription_created_subject: String,
     pub nats_subscription_created_group: String,
     pub sendgrid_api_key: Secret<String>,
     pub email_client_sender_email: String,
@@ -26,6 +27,13 @@ impl Config {
         format!(
             "{}://{}:{}",
             CONFIG.application_protocol, CONFIG.application_host, CONFIG.application_port
+        )
+    }
+
+    pub fn nats_subscription_created_subject(&self) -> String {
+        format!(
+            "{}-{}",
+            CONFIG.application_id, CONFIG.nats_subscription_created_subject
         )
     }
 }

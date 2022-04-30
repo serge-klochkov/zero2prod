@@ -56,7 +56,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
+async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
     let test_app = common::spawn_app().await;
     let test_cases = vec![
         ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
@@ -68,7 +68,7 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
         assert_eq!(
             400,
             response.status().as_u16(),
-            "The API did not return a 200 OK when the payload was {}.",
+            "The API did not return a 400 Bad request when the payload was {}.",
             description
         );
         let result = sqlx::query("SELECT email, name FROM subscriptions")
@@ -86,7 +86,7 @@ async fn subscribe_returns_a_200_when_fields_are_present_but_empty() {
 #[tokio::test(flavor = "multi_thread")]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let test_app = common::spawn_app().await;
-    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    let body = "name=To%20Confirm&email=to_confirm%40gmail.com";
     Mock::given(path("/mail/send"))
         .and(method("POST"))
         .respond_with(ResponseTemplate::new(200))
@@ -96,20 +96,8 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
 
     test_app.post_subscriptions(body.into()).await;
 
-    let received_requests = common::eventually(
-        || async {
-            let maybe_requests = test_app.mock_server.received_requests().await;
-            let requests = maybe_requests.unwrap_or(vec![]);
-            if requests.len() > 0 {
-                Ok(requests)
-            } else {
-                anyhow::bail!("Mock server has no received requests yet")
-            }
-        },
-        100,
-        50,
-    )
-    .await;
+    let received_requests =
+        common::eventually(|| async { test_app.get_received_requests().await }, 100, 50).await;
 
     let body: SendEmailRequest = serde_json::from_slice(&received_requests[0].body).unwrap();
 
@@ -130,15 +118,21 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         .send()
         .await
         .expect("Failed to execute request");
-    assert_eq!(response.status().as_u16(), 200);
+    assert_eq!(
+        response.status().as_u16(),
+        200,
+        "Test database is {}, link is {}",
+        &test_app.db_name,
+        confirmation_link,
+    );
 
     // Subscription is now confirmed
     let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions",)
         .fetch_one(&test_app.db_pool)
         .await
         .expect("Failed to fetch saved subscription.");
-    assert_eq!(saved.email, "ursula_le_guin@gmail.com");
-    assert_eq!(saved.name, "le guin");
+    assert_eq!(saved.email, "to_confirm@gmail.com");
+    assert_eq!(saved.name, "To Confirm");
     assert_eq!(saved.status, Some("confirmed".to_owned()));
 
     // Wiremock asserts on drop

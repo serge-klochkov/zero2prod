@@ -30,7 +30,7 @@ pub fn run(
     let _ = tokio::spawn(async move {
         let sub_created = nats_connection_data_clone
             .queue_subscribe(
-                &CONFIG.nats_subscription_created_subject,
+                &CONFIG.nats_subscription_created_subject(),
                 &CONFIG.nats_subscription_created_group,
             )
             .await

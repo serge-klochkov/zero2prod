@@ -2,6 +2,7 @@ use actix_web::dev::Server;
 use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, PgConnection, PgPool};
+use std::env;
 use std::future::Future;
 use std::net::TcpListener;
 use std::time::Duration;
@@ -33,7 +34,13 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 });
 
 pub async fn spawn_app() -> TestApp {
-    lazy_static::initialize(&CONFIG);
+    let _ = tokio::runtime::Handle::current()
+        .spawn_blocking(|| async {
+            env::set_var("APPLICATION_ID", Uuid::new_v4().to_string());
+            lazy_static::initialize(&CONFIG);
+        })
+        .await
+        .unwrap();
     let _ = Lazy::force(&TRACING); // FIXME: use either Lazy or lazy_static! macro
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
@@ -53,7 +60,7 @@ pub async fn spawn_app() -> TestApp {
             .await
             .expect("Could not connect to NATS");
 
-    let mock_server = MockServer::start().await;
+    let mock_server = MockServer::builder().start().await;
     let email_client = EmailClient::new(
         "test@example.com",
         &mock_server.uri(),
@@ -73,6 +80,7 @@ pub async fn spawn_app() -> TestApp {
         address,
         port,
         db_pool,
+        db_name,
         mock_server,
         nats_connection,
     }
@@ -124,6 +132,7 @@ pub struct TestApp {
     pub address: String,
     pub port: u16,
     pub db_pool: PgPool,
+    pub db_name: String,
     pub mock_server: MockServer,
     pub nats_connection: async_nats::Connection,
 }
@@ -138,5 +147,15 @@ impl TestApp {
             .send()
             .await
             .expect("Failed to execute request")
+    }
+
+    pub async fn get_received_requests(&self) -> anyhow::Result<Vec<wiremock::Request>> {
+        let maybe_requests = self.mock_server.received_requests().await;
+        let requests = maybe_requests.unwrap();
+        if requests.len() > 0 {
+            Ok(requests)
+        } else {
+            anyhow::bail!("Mock server has no received requests yet")
+        }
     }
 }
