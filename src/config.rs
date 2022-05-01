@@ -26,14 +26,14 @@ impl Config {
     pub fn application_base_url(&self) -> String {
         format!(
             "{}://{}:{}",
-            CONFIG.application_protocol, CONFIG.application_host, CONFIG.application_port
+            self.application_protocol, self.application_host, self.application_port
         )
     }
 
     pub fn nats_subscription_created_subject(&self) -> String {
         format!(
             "{}-{}",
-            CONFIG.application_id, CONFIG.nats_subscription_created_subject
+            self.application_id, self.nats_subscription_created_subject
         )
     }
 }
