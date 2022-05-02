@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::db::types::Tx;
@@ -7,11 +7,20 @@ use crate::domain::subscription_status::SubscriptionStatus;
 
 pub struct SubscriptionQueries;
 
+pub struct SubscriptionRecord {
+    pub id: Uuid,
+    pub email: String,
+    pub name: String,
+    pub status: SubscriptionStatus,
+    pub subscribed_at: DateTime<Utc>,
+}
+
 impl SubscriptionQueries {
     #[tracing::instrument(name = "Insert new subscription", skip(tx))]
     pub async fn insert_subscriber(
         tx: &mut Tx<'_>,
         new_subscriber: &NewSubscriber,
+        status: SubscriptionStatus,
     ) -> anyhow::Result<Uuid> {
         let id = Uuid::new_v4();
         sqlx::query(
@@ -24,7 +33,7 @@ impl SubscriptionQueries {
         .bind(id)
         .bind(new_subscriber.email.as_ref())
         .bind(new_subscriber.name.as_ref())
-        .bind(SubscriptionStatus::Pending)
+        .bind(status)
         .bind(Utc::now())
         .execute(tx)
         .await
@@ -120,5 +129,28 @@ impl SubscriptionQueries {
             e
         })?;
         Ok(())
+    }
+
+    #[tracing::instrument(name = "Fetching a subscription by email from the database", skip(tx))]
+    pub async fn fetch_subscription_by_email(
+        tx: &mut Tx<'_>,
+        email: &str,
+    ) -> anyhow::Result<Option<SubscriptionRecord>> {
+        let maybe_record = sqlx::query_as!(
+            SubscriptionRecord,
+            r#"
+                SELECT id, email, name, subscribed_at, status AS "status: _" 
+                FROM subscriptions 
+                WHERE email = $1
+            "#,
+            email,
+        )
+        .fetch_optional(tx)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+        Ok(maybe_record)
     }
 }

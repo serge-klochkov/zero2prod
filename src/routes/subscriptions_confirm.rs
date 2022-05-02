@@ -14,11 +14,8 @@ pub async fn subscriptions_confirm(
     pg_pool: web::Data<PgPool>,
 ) -> HttpResponse {
     match confirm_subscription(&parameters.subscription_token, &pg_pool).await {
-        ConfirmSubscriptionResult::Success => HttpResponse::Ok().finish(),
-        ConfirmSubscriptionResult::TokenNotFound => HttpResponse::Unauthorized().finish(),
-        ConfirmSubscriptionResult::UpdateSubscriptionStatusFailed => {
-            HttpResponse::InternalServerError().finish()
-        }
-        ConfirmSubscriptionResult::DatabaseError => HttpResponse::InternalServerError().finish(),
+        Ok(ConfirmSubscriptionResult::Success) => HttpResponse::Ok().finish(),
+        Ok(ConfirmSubscriptionResult::TokenNotFound) => HttpResponse::Unauthorized().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }

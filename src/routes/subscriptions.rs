@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
-use crate::handlers::save_new_subscriber::save_new_subscriber;
+use crate::handlers::save_new_subscriber::{save_new_subscriber, SaveNewSubscriberResult};
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 
@@ -26,7 +26,7 @@ impl TryFrom<FormData> for NewSubscriber {
     skip(form, pg_pool, nats_connection, config),
     fields(
         subscriber_email = %form.email,
-        subscriber_name= %form.name
+        subscriber_name = %form.name
     )
 )]
 pub async fn subscribe(
@@ -40,7 +40,10 @@ pub async fn subscribe(
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
     match save_new_subscriber(&config, &pg_pool, &nats_connection, new_subscriber).await {
-        Ok(_) => HttpResponse::Ok().finish(),
+        Ok(SaveNewSubscriberResult::AlreadySubscribed) => HttpResponse::Conflict().finish(),
+        Ok(SaveNewSubscriberResult::Success | SaveNewSubscriberResult::ResendConfirmation) => {
+            HttpResponse::Ok().finish()
+        }
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
 }
