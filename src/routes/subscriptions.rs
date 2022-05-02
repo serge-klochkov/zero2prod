@@ -1,12 +1,10 @@
 use crate::config::Config;
-use crate::db::subscription_queries::SubscriptionQueries;
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
-use crate::events::subscription_created::SubscriptionCreated;
+use crate::handlers::save_new_subscriber::save_new_subscriber;
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
-use uuid::Uuid;
 
 #[derive(serde::Deserialize, Debug)]
 pub struct FormData {
@@ -41,38 +39,8 @@ pub async fn subscribe(
         Ok(new_subscriber) => new_subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    match subscribe_handler(&config, &pg_pool, &nats_connection, new_subscriber).await {
+    match save_new_subscriber(&config, &pg_pool, &nats_connection, new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
-}
-
-// TODO: extract to "handlers"?
-#[tracing::instrument(
-    name = "Saving new subscriber details in the database",
-    skip(config, pg_pool, nats_connection, new_subscriber)
-)]
-pub async fn subscribe_handler(
-    config: &Config,
-    pg_pool: &PgPool,
-    nats_connection: &async_nats::Connection,
-    new_subscriber: NewSubscriber,
-) -> anyhow::Result<()> {
-    let subscription_token = Uuid::new_v4();
-    let mut tx = pg_pool.begin().await?;
-    let subscription_id = SubscriptionQueries::insert_subscriber(&mut tx, &new_subscriber).await?;
-    SubscriptionQueries::store_token(&mut tx, &subscription_id, &subscription_token).await?;
-    tx.commit().await?;
-    SubscriptionCreated::publish(
-        config,
-        nats_connection,
-        SubscriptionCreated {
-            email: new_subscriber.email,
-            name: new_subscriber.name,
-            subscription_token,
-            subscription_id,
-        },
-    )
-    .await?;
-    Ok(())
 }
