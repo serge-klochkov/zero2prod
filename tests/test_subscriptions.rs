@@ -103,27 +103,15 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         common::eventually(|| async { test_app.get_received_requests().await }, 100, 50).await;
 
     let confirmation_link = extract_confirmation_link(&test_app, &received_requests[0].body);
-    let response = reqwest::Client::new()
-        .get(&confirmation_link)
-        .send()
-        .await
-        .expect("Failed to execute request");
-    assert_eq!(
-        response.status().as_u16(),
-        200,
-        "Test database is {}, link is {}",
-        &test_app.db_name,
-        &confirmation_link,
-    );
 
-    // Subscription is now confirmed
-    let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions",)
-        .fetch_one(&test_app.db_pool)
-        .await
-        .expect("Failed to fetch saved subscription.");
-    assert_eq!(saved.email, "to_confirm@gmail.com");
-    assert_eq!(saved.name, "To Confirm");
-    assert_eq!(saved.status, Some("confirmed".to_owned()));
+    // Click the link for the first time: subscription is now confirmed
+    follow_link_and_expect_status(&test_app, &confirmation_link, 200).await;
+    assert_confirmed_subscription_in_db(&test_app).await;
+
+    // If we click the link twice, it is expired
+    follow_link_and_expect_status(&test_app, &confirmation_link, 401).await;
+    // DB entry has not changed
+    assert_confirmed_subscription_in_db(&test_app).await;
 
     // Wiremock asserts on drop
 }
@@ -143,4 +131,29 @@ fn extract_confirmation_link(test_app: &TestApp, body: &[u8]) -> String {
     // replace the port form .env with test app random port
     confirmation_url.set_port(Some(test_app.port)).unwrap();
     confirmation_url.to_string()
+}
+
+async fn follow_link_and_expect_status(test_app: &TestApp, link: &str, expected_status: u16) {
+    let response = reqwest::Client::new()
+        .get(link)
+        .send()
+        .await
+        .expect("Failed to execute request");
+    assert_eq!(
+        response.status().as_u16(),
+        expected_status,
+        "Test database is {}, link is {}",
+        &test_app.db_name,
+        link,
+    );
+}
+
+async fn assert_confirmed_subscription_in_db(test_app: &TestApp) {
+    let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions",)
+        .fetch_one(&test_app.db_pool)
+        .await
+        .expect("Failed to fetch saved subscription.");
+    assert_eq!(saved.email, "to_confirm@gmail.com");
+    assert_eq!(saved.name, "To Confirm");
+    assert_eq!(saved.status, Some("confirmed".to_owned()));
 }
