@@ -1,5 +1,7 @@
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
+use std::str::FromStr;
+use uuid::Uuid;
 
 use crate::handlers::confirm_subscription::{confirm_subscription, ConfirmSubscriptionResult};
 
@@ -13,9 +15,13 @@ pub async fn subscriptions_confirm(
     parameters: web::Query<Parameters>,
     pg_pool: web::Data<PgPool>,
 ) -> HttpResponse {
-    match confirm_subscription(&parameters.subscription_token, &pg_pool).await {
-        Ok(ConfirmSubscriptionResult::Success) => HttpResponse::Ok().finish(),
-        Ok(ConfirmSubscriptionResult::TokenNotFound) => HttpResponse::Unauthorized().finish(),
-        Err(_) => HttpResponse::InternalServerError().finish(),
+    if Uuid::from_str(&parameters.subscription_token).is_ok() {
+        match confirm_subscription(&parameters.subscription_token, &pg_pool).await {
+            Ok(ConfirmSubscriptionResult::Success) => HttpResponse::Ok().finish(),
+            Ok(ConfirmSubscriptionResult::TokenNotFound) => HttpResponse::Unauthorized().finish(),
+            Err(_) => HttpResponse::InternalServerError().finish(),
+        }
+    } else {
+        HttpResponse::BadRequest().finish()
     }
 }
