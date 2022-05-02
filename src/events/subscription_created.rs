@@ -2,6 +2,7 @@ use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::subscriber_email::SubscriberEmail;
@@ -20,7 +21,7 @@ pub struct SubscriptionCreated {
 impl SubscriptionCreated {
     #[tracing::instrument(
         name = "Processing SubscriptionCreated event",
-        skip(email_client, subscription_queries),
+        skip(config, email_client, pg_pool, message),
         fields(
             message_subject = %message.subject,
         )
@@ -28,7 +29,7 @@ impl SubscriptionCreated {
     pub async fn process(
         config: &Config,
         email_client: &EmailClient,
-        subscription_queries: &SubscriptionQueries,
+        pg_pool: &PgPool,
         message: Message,
     ) -> anyhow::Result<()> {
         match serde_json::from_slice::<SubscriptionCreated>(&message.data) {
@@ -54,12 +55,18 @@ impl SubscriptionCreated {
                             "Failed to send SubscriptionCreated event mail, \
                             setting the subscription status to failed",
                         );
-                        let update_result = subscription_queries
-                            .update_subscription_status(
-                                &event.subscription_id,
-                                SubscriptionStatus::Failed,
-                            )
-                            .await;
+                        let mut tx = pg_pool.begin().await?;
+                        let update_result = SubscriptionQueries::update_subscription_status(
+                            &mut tx,
+                            &event.subscription_id,
+                            SubscriptionStatus::Failed,
+                        )
+                        .await;
+                        let _ = SubscriptionQueries::delete_token(
+                            &mut tx,
+                            &event.subscription_token.to_string(),
+                        )
+                        .await;
                         match update_result {
                             Ok(_) => {}
                             Err(_) => {
@@ -76,7 +83,10 @@ impl SubscriptionCreated {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Publish SubscriptionCreated event", skip(nats_connection))]
+    #[tracing::instrument(
+        name = "Publish SubscriptionCreated event",
+        skip(config, nats_connection)
+    )]
     pub async fn publish(
         config: &Config,
         nats_connection: &async_nats::Connection,

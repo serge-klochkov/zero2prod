@@ -18,8 +18,9 @@ pub struct Config {
     pub sendgrid_api_key: Secret<String>,
     pub email_client_sender_email: String,
     pub email_client_base_url: String,
-    pub email_client_timeout_seconds: u16,
+    pub email_client_timeout_millis: u16,
 }
+
 impl Config {
     pub fn new() -> anyhow::Result<Self> {
         let env = envy::from_env::<Config>();

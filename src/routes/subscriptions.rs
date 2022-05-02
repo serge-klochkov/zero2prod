@@ -5,6 +5,7 @@ use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
 use crate::events::subscription_created::SubscriptionCreated;
 use actix_web::{web, HttpResponse};
+use sqlx::PgPool;
 use uuid::Uuid;
 
 #[derive(serde::Deserialize, Debug)]
@@ -24,7 +25,7 @@ impl TryFrom<FormData> for NewSubscriber {
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
-    skip(form, subscription_queries, nats_connection),
+    skip(form, pg_pool, nats_connection, config),
     fields(
         subscriber_email = %form.email,
         subscriber_name= %form.name
@@ -32,7 +33,7 @@ impl TryFrom<FormData> for NewSubscriber {
 )]
 pub async fn subscribe(
     form: web::Form<FormData>,
-    subscription_queries: web::Data<SubscriptionQueries>,
+    pg_pool: web::Data<PgPool>,
     nats_connection: web::Data<async_nats::Connection>,
     config: web::Data<Config>,
 ) -> HttpResponse {
@@ -40,14 +41,7 @@ pub async fn subscribe(
         Ok(new_subscriber) => new_subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    match subscribe_handler(
-        &config,
-        &subscription_queries,
-        &nats_connection,
-        new_subscriber,
-    )
-    .await
-    {
+    match subscribe_handler(&config, &pg_pool, &nats_connection, new_subscriber).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
@@ -56,22 +50,19 @@ pub async fn subscribe(
 // TODO: extract to "handlers"?
 #[tracing::instrument(
     name = "Saving new subscriber details in the database",
-    skip(new_subscriber, nats_connection, subscription_queries)
+    skip(config, pg_pool, nats_connection, new_subscriber)
 )]
 pub async fn subscribe_handler(
     config: &Config,
-    subscription_queries: &SubscriptionQueries,
+    pg_pool: &PgPool,
     nats_connection: &async_nats::Connection,
     new_subscriber: NewSubscriber,
 ) -> anyhow::Result<()> {
-    // TODO: transaction
-    let subscription_id = subscription_queries
-        .insert_subscriber(&new_subscriber)
-        .await?;
     let subscription_token = Uuid::new_v4();
-    subscription_queries
-        .store_token(&subscription_id, &subscription_token)
-        .await?;
+    let mut tx = pg_pool.begin().await?;
+    let subscription_id = SubscriptionQueries::insert_subscriber(&mut tx, &new_subscriber).await?;
+    SubscriptionQueries::store_token(&mut tx, &subscription_id, &subscription_token).await?;
+    tx.commit().await?;
     SubscriptionCreated::publish(
         config,
         nats_connection,

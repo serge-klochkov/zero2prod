@@ -1,5 +1,4 @@
 use std::net::TcpListener;
-use std::time::Duration;
 
 use secrecy::ExposeSecret;
 use sqlx::PgPool;
@@ -24,12 +23,7 @@ async fn main() -> std::io::Result<()> {
     let nats_connection =
         async_nats::connect(&format!("{}:{}", config.nats_host, config.nats_port)).await?;
 
-    let email_client = EmailClient::new(
-        &config.email_client_sender_email,
-        &config.email_client_base_url,
-        Duration::from_secs(config.email_client_timeout_seconds as u64),
-        config.sendgrid_api_key.clone(),
-    );
+    let email_client = EmailClient::new(&config);
 
     let address = format!("{}:{}", config.application_host, config.application_port);
     let listener = TcpListener::bind(address)?;

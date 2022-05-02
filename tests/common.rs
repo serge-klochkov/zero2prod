@@ -39,7 +39,7 @@ pub async fn spawn_app() -> TestApp {
     // and we will have no test interference
     config.application_id = std::thread::current().name().unwrap().to_string();
 
-    let _ = Lazy::force(&TRACING); // FIXME: use either Lazy or lazy_static! macro
+    let _ = Lazy::force(&TRACING);
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     let port = listener.local_addr().unwrap().port();
@@ -59,12 +59,10 @@ pub async fn spawn_app() -> TestApp {
             .expect("Could not connect to NATS");
 
     let mock_server = MockServer::builder().start().await;
-    let email_client = EmailClient::new(
-        "test@example.com",
-        &mock_server.uri(),
-        Duration::from_millis(1000),
-        config.sendgrid_api_key.clone(),
-    );
+    config.email_client_sender_email = "test@example.com".to_owned();
+    config.email_client_base_url = mock_server.uri();
+    config.email_client_timeout_millis = 1;
+    let email_client = EmailClient::new(&config);
 
     let server: Server = run(
         listener,
@@ -151,6 +149,7 @@ impl TestApp {
             .expect("Failed to execute request")
     }
 
+    #[allow(dead_code)] // FIXME: associated function is never used: `get_received_requests`
     pub async fn get_received_requests(&self) -> anyhow::Result<Vec<wiremock::Request>> {
         let maybe_requests = self.mock_server.received_requests().await;
         let requests = maybe_requests.unwrap();

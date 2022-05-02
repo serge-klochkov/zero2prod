@@ -1,3 +1,4 @@
+use crate::common::TestApp;
 use reqwest::Url;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
@@ -101,22 +102,9 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let received_requests =
         common::eventually(|| async { test_app.get_received_requests().await }, 100, 50).await;
 
-    let body: SendEmailRequest = serde_json::from_slice(&received_requests[0].body).unwrap();
-
-    let links: Vec<_> = linkify::LinkFinder::new()
-        .links(body.content.first().unwrap().value.as_ref())
-        .filter(|l| *l.kind() == linkify::LinkKind::Url)
-        .collect();
-    assert_eq!(links.len(), 1);
-
-    // The link from the email should work; replace the port form .env with test app random port
-    let mut confirmation_url = Url::parse(links.first().unwrap().as_str()).unwrap();
-    assert_eq!(confirmation_url.host_str().unwrap(), "127.0.0.1");
-
-    confirmation_url.set_port(Some(test_app.port)).unwrap();
-    let confirmation_link = confirmation_url.as_str();
+    let confirmation_link = extract_confirmation_link(&test_app, &received_requests[0].body);
     let response = reqwest::Client::new()
-        .get(confirmation_link)
+        .get(&confirmation_link)
         .send()
         .await
         .expect("Failed to execute request");
@@ -125,7 +113,7 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
         200,
         "Test database is {}, link is {}",
         &test_app.db_name,
-        confirmation_link,
+        &confirmation_link,
     );
 
     // Subscription is now confirmed
@@ -138,4 +126,21 @@ async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     assert_eq!(saved.status, Some("confirmed".to_owned()));
 
     // Wiremock asserts on drop
+}
+
+fn extract_confirmation_link(test_app: &TestApp, body: &[u8]) -> String {
+    let body: SendEmailRequest = serde_json::from_slice(body).unwrap();
+
+    let links: Vec<_> = linkify::LinkFinder::new()
+        .links(body.content.first().unwrap().value.as_ref())
+        .filter(|l| *l.kind() == linkify::LinkKind::Url)
+        .collect();
+    assert_eq!(links.len(), 1);
+
+    let mut confirmation_url = Url::parse(links.first().unwrap().as_str()).unwrap();
+    assert_eq!(confirmation_url.host_str().unwrap(), "127.0.0.1");
+
+    // replace the port form .env with test app random port
+    confirmation_url.set_port(Some(test_app.port)).unwrap();
+    confirmation_url.to_string()
 }

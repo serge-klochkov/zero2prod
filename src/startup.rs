@@ -1,7 +1,6 @@
 use std::net::TcpListener;
 
 use crate::config::Config;
-use crate::db::subscription_queries::SubscriptionQueries;
 use crate::email_client::EmailClient;
 use crate::events::subscription_created::SubscriptionCreated;
 use actix_web::dev::Server;
@@ -25,9 +24,7 @@ pub fn run(
 
     let nats_connection_data_clone = nats_connection_data.clone();
     let email_client_data_clone = email_client_data.clone();
-    let subscription_queries_data =
-        web::Data::new(SubscriptionQueries::new(pg_pool_data.into_inner()));
-    let subscription_queries_data_clone = subscription_queries_data.clone();
+    let pg_pool_data_clone = pg_pool_data.clone();
     let config_data_clone = config_data.clone();
 
     let _ = tokio::spawn(async move {
@@ -42,7 +39,7 @@ pub fn run(
             let _ = SubscriptionCreated::process(
                 &config_data_clone,
                 &email_client_data_clone,
-                &subscription_queries_data_clone,
+                &pg_pool_data_clone,
                 msg,
             )
             .await;
@@ -58,7 +55,7 @@ pub fn run(
                 "/subscriptions/confirm",
                 web::get().to(subscriptions_confirm),
             )
-            .app_data(subscription_queries_data.clone())
+            .app_data(pg_pool_data.clone())
             .app_data(nats_connection_data.clone())
             .app_data(email_client_data.clone())
             .app_data(config_data.clone())

@@ -7,6 +7,7 @@ use fake::Fake;
 use serde_json::{from_slice, Value};
 use wiremock::matchers::{any, header, header_exists, method, path};
 use wiremock::{Match, Mock, MockServer, Request, ResponseTemplate};
+use zero2prod::config::Config;
 
 use zero2prod::domain::subscriber_email::SubscriberEmail;
 use zero2prod::email_client::EmailClient;
@@ -114,10 +115,10 @@ fn random_email() -> SubscriberEmail {
     SubscriberEmail::parse(SafeEmail().fake()).unwrap()
 }
 
-fn create_email_client(sender: &str, mock_server: &MockServer, timeout_millis: u64) -> EmailClient {
-    EmailClient::new(
-        sender,
-        &mock_server.uri(),
-        Duration::from_millis(timeout_millis),
-    )
+fn create_email_client(sender: &str, mock_server: &MockServer, timeout_millis: u16) -> EmailClient {
+    let mut config = Config::new().expect("Failed to load config");
+    config.email_client_sender_email = sender.to_owned();
+    config.email_client_base_url = mock_server.uri();
+    config.email_client_timeout_millis = timeout_millis;
+    EmailClient::new(&config)
 }

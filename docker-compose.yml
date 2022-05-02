@@ -39,6 +39,7 @@ services:
 
   nats-webui:
     image: 'sphqxe/nats-webui'
+    restart: on-failure
     container_name: zero2prod_nats-webui
     ports:
       - '8080:80'

@@ -1,22 +1,18 @@
-use crate::domain::new_subscriber::NewSubscriber;
 use chrono::Utc;
-use sqlx::PgPool;
-use std::sync::Arc;
 use uuid::Uuid;
 
+use crate::db::types::Tx;
+use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscription_status::SubscriptionStatus;
 
-pub struct SubscriptionQueries {
-    pg_pool: Arc<PgPool>,
-}
+pub struct SubscriptionQueries;
 
 impl SubscriptionQueries {
-    pub fn new(pg_pool: Arc<PgPool>) -> Self {
-        Self { pg_pool }
-    }
-
-    #[tracing::instrument(name = "Insert new subscription", skip(self))]
-    pub async fn insert_subscriber(&self, new_subscriber: &NewSubscriber) -> anyhow::Result<Uuid> {
+    #[tracing::instrument(name = "Insert new subscription", skip(tx))]
+    pub async fn insert_subscriber(
+        tx: &mut Tx<'_>,
+        new_subscriber: &NewSubscriber,
+    ) -> anyhow::Result<Uuid> {
         let id = Uuid::new_v4();
         sqlx::query(
             r#"
@@ -30,7 +26,7 @@ impl SubscriptionQueries {
         .bind(new_subscriber.name.as_ref())
         .bind(SubscriptionStatus::Pending)
         .bind(Utc::now())
-        .execute(self.pg_pool.as_ref())
+        .execute(tx)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -39,9 +35,9 @@ impl SubscriptionQueries {
         Ok(id)
     }
 
-    #[tracing::instrument(name = "Update subscription status", skip(self))]
+    #[tracing::instrument(name = "Update subscription status", skip(tx))]
     pub async fn update_subscription_status(
-        &self,
+        tx: &mut Tx<'_>,
         subscription_id: &Uuid,
         status: SubscriptionStatus,
     ) -> anyhow::Result<()> {
@@ -54,7 +50,7 @@ impl SubscriptionQueries {
         )
         .bind(status)
         .bind(subscription_id)
-        .execute(self.pg_pool.as_ref())
+        .execute(tx)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -63,9 +59,9 @@ impl SubscriptionQueries {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Store subscription token in the database", skip(self))]
+    #[tracing::instrument(name = "Store subscription token in the database", skip(tx))]
     pub async fn store_token(
-        &self,
+        tx: &mut Tx<'_>,
         subscriber_id: &Uuid,
         subscription_token: &Uuid,
     ) -> anyhow::Result<()> {
@@ -77,7 +73,7 @@ impl SubscriptionQueries {
         )
         .bind(subscription_token.to_string().as_str())
         .bind(subscriber_id)
-        .execute(self.pg_pool.as_ref())
+        .execute(tx)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
@@ -86,12 +82,9 @@ impl SubscriptionQueries {
         Ok(())
     }
 
-    #[tracing::instrument(
-        name = "Fetch subscription email by token from the database",
-        skip(self)
-    )]
+    #[tracing::instrument(name = "Fetch subscription id by token from the database", skip(tx))]
     pub async fn fetch_subscription_id_by_token(
-        &self,
+        tx: &mut Tx<'_>,
         subscription_token: &str,
     ) -> anyhow::Result<Option<Uuid>> {
         let result = sqlx::query!(
@@ -102,12 +95,30 @@ impl SubscriptionQueries {
             "#,
             subscription_token
         )
-        .fetch_optional(self.pg_pool.as_ref())
+        .fetch_optional(tx)
         .await
         .map_err(|e| {
             tracing::error!("Failed to execute query: {:?}", e);
             e
         })?;
         Ok(result.map(|r| r.subscriber_id))
+    }
+
+    #[tracing::instrument(name = "Delete subscription token from the database", skip(tx))]
+    pub async fn delete_token(tx: &mut Tx<'_>, subscription_token: &str) -> anyhow::Result<()> {
+        sqlx::query(
+            r#"
+                DELETE FROM subscription_tokens
+                WHERE subscription_token = $1
+            "#,
+        )
+        .bind(subscription_token)
+        .execute(tx)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to execute query: {:?}", e);
+            e
+        })?;
+        Ok(())
     }
 }

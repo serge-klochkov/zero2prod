@@ -1,3 +1,4 @@
+use crate::config::Config;
 use reqwest::Client;
 use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
@@ -41,18 +42,13 @@ pub struct SendEmailRequest<'a> {
 }
 
 impl EmailClient {
-    pub fn new(
-        sender: &str,
-        base_url: &str,
-        timeout: Duration,
-        sendgrid_api_key: Secret<String>,
-    ) -> Self {
+    pub fn new(config: &Config) -> Self {
         Self {
             http_client: Client::new(),
-            sender: sender.to_owned(),
-            base_url: base_url.to_owned(),
-            timeout,
-            sendgrid_api_key,
+            sender: config.email_client_sender_email.to_owned(),
+            base_url: config.email_client_base_url.to_owned(),
+            timeout: Duration::from_millis(config.email_client_timeout_millis as u64),
+            sendgrid_api_key: config.sendgrid_api_key.clone(),
         }
     }
 
