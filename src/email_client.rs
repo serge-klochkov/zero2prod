@@ -1,6 +1,5 @@
-use crate::config::CONFIG;
 use reqwest::Client;
-use secrecy::ExposeSecret;
+use secrecy::{ExposeSecret, Secret};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::time::Duration;
@@ -12,6 +11,7 @@ pub struct EmailClient {
     sender: String,
     base_url: String,
     timeout: Duration,
+    sendgrid_api_key: Secret<String>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -41,12 +41,18 @@ pub struct SendEmailRequest<'a> {
 }
 
 impl EmailClient {
-    pub fn new(sender: &str, base_url: &str, timeout: Duration) -> Self {
+    pub fn new(
+        sender: &str,
+        base_url: &str,
+        timeout: Duration,
+        sendgrid_api_key: Secret<String>,
+    ) -> Self {
         Self {
             http_client: Client::new(),
             sender: sender.to_owned(),
             base_url: base_url.to_owned(),
             timeout,
+            sendgrid_api_key,
         }
     }
 
@@ -74,7 +80,7 @@ impl EmailClient {
         };
         self.http_client
             .post(&url)
-            .bearer_auth(&CONFIG.sendgrid_api_key.expose_secret())
+            .bearer_auth(self.sendgrid_api_key.expose_secret())
             .header("Content-Type", "application/json")
             .json(&request)
             .timeout(self.timeout)

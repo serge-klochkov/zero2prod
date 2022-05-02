@@ -1,6 +1,6 @@
 use std::net::TcpListener;
 
-use crate::config::CONFIG;
+use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
 use crate::email_client::EmailClient;
 use crate::events::subscription_created::SubscriptionCreated;
@@ -16,27 +16,31 @@ pub fn run(
     pg_pool: PgPool,
     nats_connection: async_nats::Connection,
     email_client: EmailClient,
+    config: Config,
 ) -> Result<Server, std::io::Error> {
     let pg_pool_data = web::Data::new(pg_pool);
     let nats_connection_data = web::Data::new(nats_connection);
     let email_client_data = web::Data::new(email_client);
+    let config_data = web::Data::new(config);
 
     let nats_connection_data_clone = nats_connection_data.clone();
     let email_client_data_clone = email_client_data.clone();
     let subscription_queries_data =
         web::Data::new(SubscriptionQueries::new(pg_pool_data.into_inner()));
     let subscription_queries_data_clone = subscription_queries_data.clone();
+    let config_data_clone = config_data.clone();
 
     let _ = tokio::spawn(async move {
         let sub_created = nats_connection_data_clone
             .queue_subscribe(
-                &CONFIG.nats_subscription_created_subject(),
-                &CONFIG.nats_subscription_created_group,
+                &config_data_clone.nats_subscription_created_subject(),
+                &config_data_clone.nats_subscription_created_group,
             )
             .await
             .expect("Failed to subscribe to SubscriptionCreated subject");
         if let Some(msg) = sub_created.next().await {
             let _ = SubscriptionCreated::process(
+                &config_data_clone,
                 &email_client_data_clone,
                 &subscription_queries_data_clone,
                 msg,
@@ -57,6 +61,7 @@ pub fn run(
             .app_data(subscription_queries_data.clone())
             .app_data(nats_connection_data.clone())
             .app_data(email_client_data.clone())
+            .app_data(config_data.clone())
     })
     .listen(listener)?
     .run();

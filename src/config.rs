@@ -1,11 +1,10 @@
 use std::fs::File;
 use std::io::Read;
 
-use lazy_static::lazy_static;
 use secrecy::Secret;
 use serde::Deserialize;
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct Config {
     pub application_id: String,
     pub application_host: String,
@@ -22,6 +21,28 @@ pub struct Config {
     pub email_client_timeout_seconds: u16,
 }
 impl Config {
+    pub fn new() -> anyhow::Result<Self> {
+        let env = envy::from_env::<Config>();
+        match env {
+            // if we could load the config using the existing env variables - use that
+            Ok(config) => Ok(config),
+            // otherwise, try to load the .env file
+            Err(_) => {
+                // simulate https://www.npmjs.com/package/dotenv behavior
+                // load order: OS environment -> .env.local file -> .env file
+                let _ = set_env_from_file_content(".env.local");
+                set_env_from_file_content(".env").expect(
+                    "Failed to load config from environment variables \
+                    and there is also no .env file",
+                );
+                match envy::from_env::<Config>() {
+                    Ok(config) => Ok(config),
+                    Err(e) => panic!("Failed to read the config from env: {}", e),
+                }
+            }
+        }
+    }
+
     // TODO memoize?
     pub fn application_base_url(&self) -> String {
         format!(
@@ -35,25 +56,6 @@ impl Config {
             "{}-{}",
             self.application_id, self.nats_subscription_created_subject
         )
-    }
-}
-
-fn load_config() -> anyhow::Result<Config> {
-    let env = envy::from_env::<Config>();
-    match env {
-        // if we could load the config using the existing env variables - use that
-        Ok(config) => Ok(config),
-        // otherwise, try to load the .env file
-        Err(_) => {
-            // simulate https://www.npmjs.com/package/dotenv behavior
-            // load order: OS environment -> .env.local file -> .env file
-            let _ = set_env_from_file_content(".env.local");
-            set_env_from_file_content(".env")?;
-            match envy::from_env::<Config>() {
-                Ok(config) => Ok(config),
-                Err(e) => panic!("Failed to read the config from env: {}", e),
-            }
-        }
     }
 }
 
@@ -75,8 +77,4 @@ fn set_env_from_file_content(file_path: &str) -> anyhow::Result<()> {
         }
     }
     Ok(())
-}
-
-lazy_static! {
-    pub static ref CONFIG: Config = load_config().unwrap();
 }

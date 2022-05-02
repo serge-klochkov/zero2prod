@@ -2,13 +2,12 @@ use actix_web::dev::Server;
 use once_cell::sync::Lazy;
 use secrecy::ExposeSecret;
 use sqlx::{Connection, PgConnection, PgPool};
-use std::env;
 use std::future::Future;
 use std::net::TcpListener;
 use std::time::Duration;
 use uuid::Uuid;
 use wiremock::MockServer;
-use zero2prod::config::CONFIG;
+use zero2prod::config::Config;
 use zero2prod::email_client::EmailClient;
 
 use zero2prod::startup::run;
@@ -34,13 +33,12 @@ static TRACING: Lazy<()> = Lazy::new(|| {
 });
 
 pub async fn spawn_app() -> TestApp {
-    let _ = tokio::runtime::Handle::current()
-        .spawn_blocking(|| async {
-            env::set_var("APPLICATION_ID", Uuid::new_v4().to_string());
-            lazy_static::initialize(&CONFIG);
-        })
-        .await
-        .unwrap();
+    let mut config = Config::new().expect("Failed to load config");
+    // set application to the current test suite name
+    // this way, NATS subjects will be prefixed differently
+    // and we will have no test interference
+    config.application_id = std::thread::current().name().unwrap().to_string();
+
     let _ = Lazy::force(&TRACING); // FIXME: use either Lazy or lazy_static! macro
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
@@ -48,7 +46,7 @@ pub async fn spawn_app() -> TestApp {
     let address = format!("http://127.0.0.1:{}", port);
 
     let db_name = Uuid::new_v4().to_string();
-    let database_url = CONFIG.database_url.expose_secret().as_str();
+    let database_url = config.database_url.expose_secret().as_str();
     let last_slash_index = database_url
         .rfind('/')
         .expect("Malformed DATABASE_URL: could not figure out connection string without db");
@@ -56,7 +54,7 @@ pub async fn spawn_app() -> TestApp {
     let db_pool = get_db_pool(connection_string, &db_name).await;
 
     let nats_connection =
-        async_nats::connect(&format!("{}:{}", CONFIG.nats_host, CONFIG.nats_port))
+        async_nats::connect(&format!("{}:{}", config.nats_host, config.nats_port))
             .await
             .expect("Could not connect to NATS");
 
@@ -65,6 +63,7 @@ pub async fn spawn_app() -> TestApp {
         "test@example.com",
         &mock_server.uri(),
         Duration::from_millis(1000),
+        config.sendgrid_api_key.clone(),
     );
 
     let server: Server = run(
@@ -72,6 +71,7 @@ pub async fn spawn_app() -> TestApp {
         db_pool.clone(),
         nats_connection.clone(),
         email_client,
+        config.clone(),
     )
     .expect("Failed to bind address");
     let _ = tokio::spawn(server);
@@ -83,6 +83,7 @@ pub async fn spawn_app() -> TestApp {
         db_name,
         mock_server,
         nats_connection,
+        config,
     }
 }
 
@@ -135,6 +136,7 @@ pub struct TestApp {
     pub db_name: String,
     pub mock_server: MockServer,
     pub nats_connection: async_nats::Connection,
+    pub config: Config,
 }
 
 impl TestApp {

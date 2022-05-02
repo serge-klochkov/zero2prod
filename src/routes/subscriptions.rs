@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
@@ -33,12 +34,20 @@ pub async fn subscribe(
     form: web::Form<FormData>,
     subscription_queries: web::Data<SubscriptionQueries>,
     nats_connection: web::Data<async_nats::Connection>,
+    config: web::Data<Config>,
 ) -> HttpResponse {
     let new_subscriber = match NewSubscriber::try_from(form.0) {
         Ok(new_subscriber) => new_subscriber,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    match subscribe_handler(&subscription_queries, &nats_connection, new_subscriber).await {
+    match subscribe_handler(
+        &config,
+        &subscription_queries,
+        &nats_connection,
+        new_subscriber,
+    )
+    .await
+    {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
@@ -50,6 +59,7 @@ pub async fn subscribe(
     skip(new_subscriber, nats_connection, subscription_queries)
 )]
 pub async fn subscribe_handler(
+    config: &Config,
     subscription_queries: &SubscriptionQueries,
     nats_connection: &async_nats::Connection,
     new_subscriber: NewSubscriber,
@@ -63,6 +73,7 @@ pub async fn subscribe_handler(
         .store_token(&subscription_id, &subscription_token)
         .await?;
     SubscriptionCreated::publish(
+        config,
         nats_connection,
         SubscriptionCreated {
             email: new_subscriber.email,

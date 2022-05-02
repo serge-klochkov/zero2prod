@@ -58,6 +58,7 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
     let test_app = common::spawn_app().await;
+    println!("AppId {}", test_app.config.application_id);
     let test_cases = vec![
         ("name=&email=ursula_le_guin%40gmail.com", "empty name"),
         ("name=Ursula&email=", "empty email"),
@@ -86,6 +87,7 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
 #[tokio::test(flavor = "multi_thread")]
 async fn subscribe_sends_a_confirmation_email_for_valid_data() {
     let test_app = common::spawn_app().await;
+    println!("AppId {}", test_app.config.application_id);
     let body = "name=To%20Confirm&email=to_confirm%40gmail.com";
     Mock::given(path("/mail/send"))
         .and(method("POST"))

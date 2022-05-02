@@ -1,4 +1,4 @@
-use crate::config::CONFIG;
+use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
@@ -26,6 +26,7 @@ impl SubscriptionCreated {
         )
     )]
     pub async fn process(
+        config: &Config,
         email_client: &EmailClient,
         subscription_queries: &SubscriptionQueries,
         message: Message,
@@ -36,7 +37,7 @@ impl SubscriptionCreated {
                     "Welcome to our newsletter!\n\
                     Visit {}/subscriptions/confirm?subscription_token={} \
                     to confirm your subscription",
-                    CONFIG.application_base_url(),
+                    config.application_base_url(),
                     event.subscription_token
                 );
                 let mail_send_result = email_client
@@ -77,12 +78,13 @@ impl SubscriptionCreated {
 
     #[tracing::instrument(name = "Publish SubscriptionCreated event", skip(nats_connection))]
     pub async fn publish(
+        config: &Config,
         nats_connection: &async_nats::Connection,
         event: SubscriptionCreated,
     ) -> anyhow::Result<()> {
         nats_connection
             .publish(
-                &CONFIG.nats_subscription_created_subject(),
+                &config.nats_subscription_created_subject(),
                 serde_json::to_vec(&event)?,
             )
             .await?;
