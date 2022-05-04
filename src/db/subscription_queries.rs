@@ -36,11 +36,7 @@ impl SubscriptionQueries {
         .bind(status)
         .bind(Utc::now())
         .execute(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(id)
     }
 
@@ -60,11 +56,7 @@ impl SubscriptionQueries {
         .bind(status)
         .bind(subscription_id)
         .execute(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(())
     }
 
@@ -83,11 +75,7 @@ impl SubscriptionQueries {
         .bind(subscription_token.to_string().as_str())
         .bind(subscriber_id)
         .execute(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(())
     }
 
@@ -105,11 +93,7 @@ impl SubscriptionQueries {
             subscription_token
         )
         .fetch_optional(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(result.map(|r| r.subscriber_id))
     }
 
@@ -123,11 +107,7 @@ impl SubscriptionQueries {
         )
         .bind(subscription_token)
         .execute(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(())
     }
 
@@ -146,11 +126,7 @@ impl SubscriptionQueries {
             email,
         )
         .fetch_optional(tx)
-        .await
-        .map_err(|e| {
-            tracing::error!("Failed to execute query: {:?}", e);
-            e
-        })?;
+        .await?;
         Ok(maybe_record)
     }
 }

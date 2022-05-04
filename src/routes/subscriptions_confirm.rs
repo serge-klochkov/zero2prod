@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::handlers::confirm_subscription::{confirm_subscription, ConfirmSubscriptionResult};
+use crate::handlers::confirm_subscription::{confirm_subscription, ConfirmSubscriptionOutput};
 
 #[derive(serde::Deserialize, Debug)]
 pub struct Parameters {
@@ -17,9 +17,12 @@ pub async fn subscriptions_confirm(
 ) -> HttpResponse {
     if Uuid::from_str(&parameters.subscription_token).is_ok() {
         match confirm_subscription(&parameters.subscription_token, &pg_pool).await {
-            Ok(ConfirmSubscriptionResult::Success) => HttpResponse::Ok().finish(),
-            Ok(ConfirmSubscriptionResult::TokenNotFound) => HttpResponse::Unauthorized().finish(),
-            Err(_) => HttpResponse::InternalServerError().finish(),
+            Ok(ConfirmSubscriptionOutput::Success) => HttpResponse::Ok().finish(),
+            Ok(ConfirmSubscriptionOutput::TokenNotFound) => HttpResponse::Unauthorized().finish(),
+            Err(err) => {
+                tracing::error!(error = ?err, "Failed to confirm a subscription");
+                HttpResponse::InternalServerError().finish()
+            }
         }
     } else {
         HttpResponse::BadRequest().finish()

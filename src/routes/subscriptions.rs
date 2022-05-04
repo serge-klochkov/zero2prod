@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscriber_email::SubscriberEmail;
 use crate::domain::subscriber_name::SubscriberName;
-use crate::handlers::save_new_subscriber::{save_new_subscriber, SaveNewSubscriberResult};
+use crate::handlers::save_new_subscriber::{save_new_subscriber, SaveNewSubscriberOutput};
 use actix_web::{web, HttpResponse};
 use sqlx::PgPool;
 
@@ -40,10 +40,13 @@ pub async fn subscribe(
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
     match save_new_subscriber(&config, &pg_pool, &nats_connection, new_subscriber).await {
-        Ok(SaveNewSubscriberResult::AlreadySubscribed) => HttpResponse::Conflict().finish(),
-        Ok(SaveNewSubscriberResult::Success | SaveNewSubscriberResult::ResendConfirmation) => {
+        Ok(SaveNewSubscriberOutput::AlreadySubscribed) => HttpResponse::Conflict().finish(),
+        Ok(SaveNewSubscriberOutput::Success | SaveNewSubscriberOutput::ResendConfirmation) => {
             HttpResponse::Ok().finish()
         }
-        Err(_) => HttpResponse::InternalServerError().finish(),
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to add a new subscriber");
+            HttpResponse::InternalServerError().finish()
+        }
     }
 }

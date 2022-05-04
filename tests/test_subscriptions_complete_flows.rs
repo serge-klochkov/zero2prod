@@ -29,12 +29,12 @@ async fn sends_an_email_and_confirms_subscription_for_a_new_subscriber() {
 
     // Click the link for the first time: subscription is now confirmed
     follow_link_and_expect_status(&test_app, &confirmation_link, 200).await;
-    assert_confirmed_subscription_in_db(&test_app, email, name).await;
+    assert_subscription_in_db(&test_app, email, name, SubscriptionStatus::Confirmed).await;
 
     // If we click the link twice, it is expired
     follow_link_and_expect_status(&test_app, &confirmation_link, 401).await;
     // DB entry has not changed
-    assert_confirmed_subscription_in_db(&test_app, email, name).await;
+    assert_subscription_in_db(&test_app, email, name, SubscriptionStatus::Confirmed).await;
 
     // We cannot subscribe with the same email one more time - it is already confirmed
     // the status Conflict should represent exactly that
@@ -63,7 +63,7 @@ async fn sends_an_email_and_confirms_subscription_for_a_previously_failed_one() 
 
     // Click the link: failed subscription is now confirmed
     follow_link_and_expect_status(&test_app, &confirmation_link, 200).await;
-    assert_confirmed_subscription_in_db(&test_app, email, name).await;
+    assert_subscription_in_db(&test_app, email, name, SubscriptionStatus::Confirmed).await;
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -85,7 +85,26 @@ async fn sends_an_email_and_confirms_subscription_for_a_pending_one() {
 
     // Click the link: failed subscription is now confirmed
     follow_link_and_expect_status(&test_app, &confirmation_link, 200).await;
-    assert_confirmed_subscription_in_db(&test_app, email, name).await;
+    assert_subscription_in_db(&test_app, email, name, SubscriptionStatus::Confirmed).await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn sets_subscription_as_failed_when_email_sending_fails() {
+    let test_app = common::spawn_app().await;
+    Mock::given(path("/mail/send"))
+        .and(method("POST"))
+        .respond_with(ResponseTemplate::new(200))
+        .expect(1)
+        .mount(&test_app.mock_server)
+        .await;
+
+    let email = "will_fail@gmail.com";
+    let name = "Will Fail";
+    let body = format!("name={}&email={}", name, email);
+
+    test_app.post_subscriptions(&body).await;
+
+    common::eventually(|| async { test_app.get_received_requests().await }, 100, 50).await;
 }
 
 fn extract_confirmation_link(test_app: &TestApp, body: &[u8]) -> String {
@@ -120,14 +139,19 @@ async fn follow_link_and_expect_status(test_app: &TestApp, link: &str, expected_
     );
 }
 
-async fn assert_confirmed_subscription_in_db(test_app: &TestApp, email: &str, name: &str) {
+async fn assert_subscription_in_db(
+    test_app: &TestApp,
+    email: &str,
+    name: &str,
+    status: SubscriptionStatus,
+) {
     let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions",)
         .fetch_one(&test_app.db_pool)
         .await
         .expect("Failed to fetch saved subscription.");
     assert_eq!(saved.email, email);
     assert_eq!(saved.name, name);
-    assert_eq!(saved.status, Some("confirmed".to_owned()));
+    assert_eq!(saved.status, Some(status.to_string().to_lowercase()));
 }
 
 async fn insert_new_subscription(

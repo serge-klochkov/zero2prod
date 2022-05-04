@@ -32,20 +32,43 @@ cargo check..............................................................Passed
 
 ### POST /api/subscriptions
 
+#### Description
+
+Create a pending subscription to the newsletter. 
+If background email sending task fails, the subscription will be marked as failed.
+
+#### Headers
+
 Content-Type: application/x-www-form-urlencoded
  
-Request (form data)
+#### Request (form data)
 
 ```
 email: <non-empty string, valid email>
 name: <non-empty string>
 ```
 
-Responses
+#### Responses
 
-* 200 OK, empty body
-* 500 ISE, empty body (temporary)
+* 200 OK - saved a new subscription or re-send pending or failed subscription confirmation
+* 409 Conflict - specified email already exists as a confirmed subscription
+* 500 ISE - unexpected error
 
+---
+
+### GET /api/subscriptions/confirm?subscription_token=UUID
+
+#### Description
+
+Confirm a pending subscription to the newsletter. 
+Subcription token should be a valid UUID string.
+
+#### Responses
+
+* 200 OK - subscription confirmed
+* 401 Unauthorized - token not found
+* 500 ISE - unexpected error
+---
 
 ## Differences from the suggested implementation in the book
 
@@ -57,4 +80,5 @@ as it is a third party dependency and should not block the main path.
 * `eventually` helper in `test/common.rs` module. 
 Helps waiting only required amount of time until an async background operation 
 (such as NATS event handling) is completed.
-* DB layer is separated from `routes` module
+* DB and handlers layers are separated from the `routes` module
+* More complex test subscriptions flows and generally more coverage

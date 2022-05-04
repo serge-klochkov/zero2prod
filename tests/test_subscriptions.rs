@@ -1,3 +1,6 @@
+use wiremock::matchers::any;
+use wiremock::{Mock, ResponseTemplate};
+
 mod common;
 
 /// See test_subscriptions_complete_flows for additional cases
@@ -13,6 +16,11 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 #[tokio::test(flavor = "multi_thread")]
 async fn subscribe_persists_a_new_subscriber() {
     let test_app = common::spawn_app().await;
+    // Mail send requests are verified in the complete flows tests
+    Mock::given(any())
+        .respond_with(ResponseTemplate::new(200))
+        .mount(&test_app.mock_server)
+        .await;
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     test_app.post_subscriptions(body).await;
     let saved = sqlx::query!("SELECT email, name, (status :: TEXT) FROM subscriptions")
@@ -78,4 +86,17 @@ async fn subscribe_returns_a_400_when_fields_are_present_but_empty() {
             "There should be no saved subscriptions in case of failure"
         );
     }
+}
+
+#[tokio::test]
+async fn subscribe_fails_if_there_is_a_fatal_database_error() {
+    let app = common::spawn_app().await;
+    let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
+    // Sabotage the database
+    sqlx::query!("ALTER TABLE subscription_tokens DROP COLUMN subscription_token")
+        .execute(&app.db_pool)
+        .await
+        .unwrap();
+    let response = app.post_subscriptions(body.into()).await;
+    assert_eq!(response.status().as_u16(), 500);
 }

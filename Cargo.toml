@@ -22,6 +22,7 @@ derive_more = "0.99.17"
 envy = "0.4.2"
 lazy_static = "1.4.0"
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
+thiserror = "1.0.31"
 tokio = { version = "1.18.0", features = ["macros", "rt-multi-thread"] }
 tracing = { version = "0.1.32", features = ["log"] }
 tracing-actix-web = "0.5.1"

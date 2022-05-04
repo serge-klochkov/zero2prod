@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
+use anyhow::Context;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -55,7 +56,10 @@ impl SubscriptionCreated {
                             "Failed to send SubscriptionCreated event mail, \
                             setting the subscription status to failed",
                         );
-                        let mut tx = pg_pool.begin().await?;
+                        let mut tx = pg_pool
+                            .begin()
+                            .await
+                            .context("Failed to acquire a transaction")?;
                         let update_result = SubscriptionQueries::update_subscription_status(
                             &mut tx,
                             &event.subscription_id,
@@ -73,6 +77,9 @@ impl SubscriptionCreated {
                                 tracing::error!("Failed to mark subscription as failed")
                             }
                         }
+                        tx.commit()
+                            .await
+                            .context("Failed to commit the transaction")?;
                     }
                 }
             }
@@ -80,24 +87,6 @@ impl SubscriptionCreated {
                 tracing::error!("Could not deserialize message");
             }
         };
-        Ok(())
-    }
-
-    #[tracing::instrument(
-        name = "Publish SubscriptionCreated event",
-        skip(config, nats_connection)
-    )]
-    pub async fn publish(
-        config: &Config,
-        nats_connection: &async_nats::Connection,
-        event: SubscriptionCreated,
-    ) -> anyhow::Result<()> {
-        nats_connection
-            .publish(
-                &config.nats_subscription_created_subject(),
-                serde_json::to_vec(&event)?,
-            )
-            .await?;
         Ok(())
     }
 }
