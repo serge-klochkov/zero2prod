@@ -4,6 +4,8 @@ use anyhow::Context;
 use async_nats::Message;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use std::sync::Arc;
+use tokio::task::JoinHandle;
 use uuid::Uuid;
 
 use crate::domain::subscriber_email::SubscriberEmail;
@@ -88,5 +90,25 @@ impl SubscriptionCreated {
             }
         };
         Ok(())
+    }
+
+    pub fn subscribe(
+        nats_connection: Arc<async_nats::Connection>,
+        config: Arc<Config>,
+        email_client: Arc<EmailClient>,
+        pg_pool: Arc<PgPool>,
+    ) -> JoinHandle<()> {
+        tokio::spawn(async move {
+            let sub_created = &nats_connection
+                .queue_subscribe(
+                    &config.nats_subscription_created_subject(),
+                    &config.nats_subscription_created_group,
+                )
+                .await
+                .expect("Failed to subscribe to SubscriptionCreated subject");
+            if let Some(msg) = sub_created.next().await {
+                let _ = SubscriptionCreated::process(&config, &email_client, &pg_pool, msg).await;
+            }
+        })
     }
 }

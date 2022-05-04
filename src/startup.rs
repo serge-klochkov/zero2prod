@@ -26,25 +26,12 @@ pub fn run(
     let email_client_data_clone = email_client_data.clone();
     let pg_pool_data_clone = pg_pool_data.clone();
     let config_data_clone = config_data.clone();
-
-    let _ = tokio::spawn(async move {
-        let sub_created = nats_connection_data_clone
-            .queue_subscribe(
-                &config_data_clone.nats_subscription_created_subject(),
-                &config_data_clone.nats_subscription_created_group,
-            )
-            .await
-            .expect("Failed to subscribe to SubscriptionCreated subject");
-        if let Some(msg) = sub_created.next().await {
-            let _ = SubscriptionCreated::process(
-                &config_data_clone,
-                &email_client_data_clone,
-                &pg_pool_data_clone,
-                msg,
-            )
-            .await;
-        }
-    });
+    let _ = SubscriptionCreated::subscribe(
+        nats_connection_data_clone.into_inner(),
+        config_data_clone.into_inner(),
+        email_client_data_clone.into_inner(),
+        pg_pool_data_clone.into_inner(),
+    );
 
     let server = HttpServer::new(move || {
         App::new()
