@@ -2,6 +2,7 @@ use anyhow::Context;
 use sqlx::PgPool;
 
 use crate::db::subscription_queries::SubscriptionQueries;
+use crate::db::transaction::{begin_transaction, commit_transaction};
 use crate::domain::subscription_status::SubscriptionStatus;
 use crate::handlers::errors::error_chain_fmt;
 
@@ -25,18 +26,15 @@ pub async fn confirm_subscription(
     subscription_token: &str,
     pg_pool: &PgPool,
 ) -> Result<ConfirmSubscriptionOutput, ConfirmSubscriptionError> {
-    let mut tx = pg_pool
-        .begin()
-        .await
-        .context("Failed to acquire a transaction")?;
     let maybe_subscription_id =
-        SubscriptionQueries::fetch_subscription_id_by_token(&mut tx, subscription_token)
+        SubscriptionQueries::fetch_subscription_id_by_token(pg_pool, subscription_token)
             .await
             .context("Failed to fetch a subscription ID by the subscription token")?;
     match maybe_subscription_id {
         // Non-existing token = 400
         None => Ok(ConfirmSubscriptionOutput::TokenNotFound),
         Some(id) => {
+            let mut tx = begin_transaction(pg_pool).await?;
             SubscriptionQueries::update_subscription_status(
                 &mut tx,
                 &id,
@@ -47,9 +45,7 @@ pub async fn confirm_subscription(
             let _ = SubscriptionQueries::delete_token(&mut tx, subscription_token)
                 .await
                 .context("Failed to delete the subscription token")?;
-            tx.commit()
-                .await
-                .context("Failed to commit the transaction")?;
+            commit_transaction(tx).await?;
             Ok(ConfirmSubscriptionOutput::Success)
         }
     }

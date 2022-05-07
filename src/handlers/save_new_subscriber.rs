@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::config::Config;
 use crate::db::subscription_queries::SubscriptionQueries;
+use crate::db::transaction::{begin_transaction, commit_transaction};
 use crate::domain::new_subscriber::NewSubscriber;
 use crate::domain::subscription_status::SubscriptionStatus;
 use crate::events::subscription_created::SubscriptionCreated;
@@ -36,54 +37,55 @@ pub async fn save_new_subscriber(
     new_subscriber: NewSubscriber,
 ) -> Result<SaveNewSubscriberOutput, SaveNewSubscriberError> {
     let subscription_token = Uuid::new_v4();
-    let mut tx = pg_pool
-        .begin()
-        .await
-        .context("Failed to acquire a transaction")?;
     let maybe_subscription =
-        SubscriptionQueries::fetch_subscription_by_email(&mut tx, new_subscriber.email.as_ref())
+        SubscriptionQueries::fetch_subscription_by_email(pg_pool, new_subscriber.email.as_ref())
             .await
             .context("Failed to fetch a subscription by the email")?;
     let status: SaveNewSubscriberOutput;
     let subscription_id: Uuid;
-    match maybe_subscription {
+    let mut tx = match maybe_subscription {
         Some(sub) if sub.status == SubscriptionStatus::Confirmed => {
             return Ok(SaveNewSubscriberOutput::AlreadySubscribed)
         }
-        // Failed = change to Pending
-        Some(sub) if sub.status == SubscriptionStatus::Failed => {
-            SubscriptionQueries::update_subscription_status(
-                &mut tx,
-                &sub.id,
-                SubscriptionStatus::Pending,
-            )
-            .await
-            .context("Failed to update the subscription status to Pending")?;
-            subscription_id = sub.id;
-            status = SaveNewSubscriberOutput::ResendConfirmation;
+        maybe_subscription => {
+            let mut tx = begin_transaction(pg_pool).await?;
+            match maybe_subscription {
+                // Failed = change to Pending
+                Some(sub) if sub.status == SubscriptionStatus::Failed => {
+                    SubscriptionQueries::update_subscription_status(
+                        &mut tx,
+                        &sub.id,
+                        SubscriptionStatus::Pending,
+                    )
+                    .await
+                    .context("Failed to update the subscription status to Pending")?;
+                    subscription_id = sub.id;
+                    status = SaveNewSubscriberOutput::ResendConfirmation;
+                }
+                // Resend = do nothing
+                Some(sub) if sub.status == SubscriptionStatus::Pending => {
+                    subscription_id = sub.id;
+                    status = SaveNewSubscriberOutput::ResendConfirmation;
+                }
+                // Subscription does not exist, insert a new one
+                _ => {
+                    subscription_id = SubscriptionQueries::insert_subscriber(
+                        &mut tx,
+                        &new_subscriber,
+                        SubscriptionStatus::Pending,
+                    )
+                    .await
+                    .context("Failed to insert a new subscription")?;
+                    status = SaveNewSubscriberOutput::Success;
+                }
+            }
+            tx
         }
-        // Pending = do nothing
-        Some(sub) => {
-            subscription_id = sub.id;
-            status = SaveNewSubscriberOutput::ResendConfirmation;
-        }
-        None => {
-            subscription_id = SubscriptionQueries::insert_subscriber(
-                &mut tx,
-                &new_subscriber,
-                SubscriptionStatus::Pending,
-            )
-            .await
-            .context("Failed to insert a new subscription")?;
-            status = SaveNewSubscriberOutput::Success;
-        }
-    }
+    };
     SubscriptionQueries::store_token(&mut tx, &subscription_id, &subscription_token)
         .await
         .context("Failed to store the subscription token")?;
-    tx.commit()
-        .await
-        .context("Failed to commit the transaction")?;
+    commit_transaction(tx).await?;
     let event = SubscriptionCreated {
         email: new_subscriber.email,
         name: new_subscriber.name,

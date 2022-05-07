@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use sqlx::{Executor, Postgres};
 use uuid::Uuid;
 
 use crate::db::types::Tx;
@@ -80,10 +81,13 @@ impl SubscriptionQueries {
     }
 
     #[tracing::instrument(name = "Fetch subscription id by token from the database", skip(tx))]
-    pub async fn fetch_subscription_id_by_token(
-        tx: &mut Tx<'_>,
+    pub async fn fetch_subscription_id_by_token<'a, E>(
+        tx: E,
         subscription_token: &str,
-    ) -> anyhow::Result<Option<Uuid>> {
+    ) -> anyhow::Result<Option<Uuid>>
+    where
+        E: Executor<'a, Database = Postgres>,
+    {
         let result = sqlx::query!(
             r#"
                 SELECT subscriber_id 
@@ -111,11 +115,17 @@ impl SubscriptionQueries {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Fetching a subscription by email from the database", skip(tx))]
-    pub async fn fetch_subscription_by_email(
-        tx: &mut Tx<'_>,
+    #[tracing::instrument(
+        name = "Fetching a subscription by email from the database",
+        skip(executor)
+    )]
+    pub async fn fetch_subscription_by_email<'a, E>(
+        executor: E,
         email: &str,
-    ) -> anyhow::Result<Option<SubscriptionRecord>> {
+    ) -> anyhow::Result<Option<SubscriptionRecord>>
+    where
+        E: Executor<'a, Database = Postgres>,
+    {
         let maybe_record = sqlx::query_as!(
             SubscriptionRecord,
             r#"
@@ -125,7 +135,7 @@ impl SubscriptionQueries {
             "#,
             email,
         )
-        .fetch_optional(tx)
+        .fetch_optional(executor)
         .await?;
         Ok(maybe_record)
     }

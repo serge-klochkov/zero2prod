@@ -1,2 +1,3 @@
 pub mod subscription_queries;
-mod types;
+pub mod transaction;
+pub mod types;
