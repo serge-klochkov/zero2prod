@@ -99,7 +99,7 @@ impl SubscriptionCreated {
         pg_pool: Arc<PgPool>,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let sub_created = &nats_connection
+            let sub_created = nats_connection
                 .queue_subscribe(
                     &config.nats_subscription_created_subject(),
                     &config.nats_subscription_created_group,
