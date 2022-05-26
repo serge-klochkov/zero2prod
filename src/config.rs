@@ -14,7 +14,7 @@ pub struct Config {
     pub nats_host: String,
     pub nats_port: u16,
     nats_subscription_created_subject: String,
-    pub nats_subscription_created_group: String,
+    nats_subscription_created_group: String,
     pub sendgrid_api_key: Secret<String>,
     pub email_client_sender_email: String,
     pub email_client_base_url: String,
@@ -56,6 +56,13 @@ impl Config {
         format!(
             "{}-{}",
             self.application_id, self.nats_subscription_created_subject
+        )
+    }
+
+    pub fn nats_subscription_created_group(&self) -> String {
+        format!(
+            "{}-{}",
+            self.application_id, self.nats_subscription_created_group
         )
     }
 }

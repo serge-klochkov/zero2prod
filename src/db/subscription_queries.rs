@@ -80,9 +80,12 @@ impl SubscriptionQueries {
         Ok(())
     }
 
-    #[tracing::instrument(name = "Fetch subscription id by token from the database", skip(tx))]
+    #[tracing::instrument(
+        name = "Fetch subscription id by token from the database",
+        skip(executor)
+    )]
     pub async fn fetch_subscription_id_by_token<'a, E>(
-        tx: E,
+        executor: E,
         subscription_token: &str,
     ) -> anyhow::Result<Option<Uuid>>
     where
@@ -96,7 +99,7 @@ impl SubscriptionQueries {
             "#,
             subscription_token
         )
-        .fetch_optional(tx)
+        .fetch_optional(executor)
         .await?;
         Ok(result.map(|r| r.subscriber_id))
     }

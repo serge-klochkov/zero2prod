@@ -58,7 +58,7 @@ pub async fn spawn_app() -> TestApp {
             .await
             .expect("Could not connect to NATS");
 
-    let mock_server = MockServer::builder().start().await;
+    let mock_server = MockServer::start().await;
     config.email_client_sender_email = "test@example.com".to_owned();
     config.email_client_base_url = mock_server.uri();
     config.email_client_timeout_millis = 1;

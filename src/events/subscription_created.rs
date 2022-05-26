@@ -102,7 +102,7 @@ impl SubscriptionCreated {
             let sub_created = nats_connection
                 .queue_subscribe(
                     &config.nats_subscription_created_subject(),
-                    &config.nats_subscription_created_group,
+                    &config.nats_subscription_created_group(),
                 )
                 .await
                 .expect("Failed to subscribe to SubscriptionCreated subject");
