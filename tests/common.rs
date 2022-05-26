@@ -61,7 +61,7 @@ pub async fn spawn_app() -> TestApp {
     let mock_server = MockServer::start().await;
     config.email_client_sender_email = "test@example.com".to_owned();
     config.email_client_base_url = mock_server.uri();
-    config.email_client_timeout_millis = 1;
+    config.email_client_timeout_millis = 10000;
     let email_client = EmailClient::new(&config);
 
     let server: Server = run(
